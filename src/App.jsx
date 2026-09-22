@@ -1,14 +1,18 @@
 /*
   App.jsx — the main component of Dagen.
 
-  Step 2: the task list is now STATE, so it can change.
-  App owns the list. The form and the rows only report what happened
-  (add, toggle, delete); App decides how the list changes.
+  The task list is STATE, so it can change. App owns the list.
+  The form and the rows only report what happened (add, toggle, delete);
+  App decides how the list changes.
+
+  Step 3: the list is loaded from storage when the app starts and saved
+  every time it changes, so it survives a reload.
 */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AddTaskForm from './components/AddTaskForm.jsx'
 import TaskItem from './components/TaskItem.jsx'
+import { loadTasks, saveTasks } from './lib/storage.js'
 
 // Makes a short unique id, e.g. "mfk3x2a9q1".
 // Date.now() = milliseconds since 1970, written in base 36 to keep it short,
@@ -18,8 +22,17 @@ function makeId() {
 }
 
 function App() {
-  // The list of tasks, starting empty. setTasks replaces it with a new list.
-  const [tasks, setTasks] = useState([])
+  // The list of tasks. Its starting value is whatever was saved last time.
+  // Passing a FUNCTION (() => loadTasks()) means React reads storage only
+  // once, when the app starts, not on every redraw.
+  const [tasks, setTasks] = useState(() => loadTasks())
+
+  // useEffect = "after drawing, do this side job".
+  // [tasks] at the end means: only when tasks has changed.
+  // So every add, tick or delete is saved automatically. No save button.
+  useEffect(() => {
+    saveTasks(tasks)
+  }, [tasks])
 
   function addTask(title) {
     const newTask = { id: makeId(), title: title, status: 'todo' }
