@@ -49,7 +49,7 @@ function App() {
     setTasks(
       tasks.map((task) =>
         task.id === id
-          ? { ...task, status: task.status === 'done' ? 'todo' : 'done' }
+                    ? { ...task, status: 'todo' }
           : task,
       ),
     )
