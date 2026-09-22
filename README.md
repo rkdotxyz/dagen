@@ -1,16 +1,28 @@
-# React + Vite
+# Dagen
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+*Dagen* is Swedish for "the day". A phone-friendly planner: tasks live in colour-coded categories, every task gets a time, and each one appears in Google Calendar.
 
-Currently, two official plugins are available:
+**Status:** Phase 1 of 10 in progress: a task list saved in the browser.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Run it locally
 
-## React Compiler
+    npm install
+    npm run dev
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Then open http://localhost:5173
 
-## Expanding the Oxlint configuration
+## Roadmap
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- [x] Phase 0: Setup, GitHub and Vercel
+- [ ] Phase 1: Task list
+- [ ] Phase 2: Automated checks (GitHub Actions)
+- [ ] Phase 3: Categories and colours
+- [ ] Phase 4: The + create flow
+- [ ] Phase 5: Week strip and task actions
+- [ ] Phase 6: Recurring chores (v1.0)
+- [ ] Phase 7: Cloud and login
+- [ ] Phase 8: Push to Google Calendar
+- [ ] Phase 9: Two-way sync (v2.0)
+- [ ] Phase 10: Document and publish
+
+See `docs/build-log.md` for how it's going.

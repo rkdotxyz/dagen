@@ -1,61 +1,157 @@
 /*
   index.css — styles for the whole of Dagen.
 
-  Colours are stored once as "custom properties" (the --names below)
-  and reused everywhere with var(--name). Change a colour here and it
-  changes across the whole app. Later phases add more of them.
+  Colours live once as tokens (the --names) and are reused with var(--name).
+  Dark mode only swaps the tokens. This file already includes the styles
+  for the add form and ticked tasks you'll build in step 2.
 */
 
 :root {
-  /* Light mode colours (the default) */
   --bg: #f7f7f5; /* page background */
+  --surface: #ffffff; /* rows and inputs */
   --text: #1f1f1f; /* main text */
-  --muted: #6b6b6b; /* quieter text, like the date */
+  --muted: #6b6b6b; /* quieter text */
+  --line: #e2e2de; /* thin borders */
+  --accent: #0b6e7f; /* buttons and ticks (Google's "Peacock" family) */
+  --accent-text: #ffffff; /* text on top of the accent colour */
 
-  /* The system font of whatever device you're on: San Francisco on
-     Mac and iPhone, Roboto on Android, Segoe on Windows. */
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
   background: var(--bg);
 }
 
-/* If the device is set to dark mode, swap in dark colours.
-   Only the tokens change; everything that uses them follows. */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #151515;
+    --surface: #1f1f1f;
     --text: #ededed;
     --muted: #9a9a9a;
+    --line: #2e2e2e;
+    --accent: #5cc8db;
+    --accent-text: #0d1f22;
   }
 }
 
-/* Make widths include padding and borders. Saves a lot of layout surprises. */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
-/* Browsers add a small margin around the page by default; remove it. */
 body {
   margin: 0;
 }
 
-/* The main column: never wider than about 40 characters x 16px,
-   centred, with breathing room so text never touches the screen edge. */
+/* The main column: centred, never too wide, padded from screen edges. */
 .app {
   max-width: 40rem;
-  margin: 0 auto; /* 0 top/bottom, "auto" left/right = centred */
-  padding: 2rem 1.25rem; /* 2rem top/bottom, 1.25rem left/right */
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+.app-header {
+  margin-bottom: 1.5rem;
 }
 
 h1 {
-  font-size: 2.5rem; /* rem = relative to the base text size (usually 16px) */
+  font-size: 2.5rem;
   margin: 0;
 }
 
 .today {
   color: var(--muted);
   font-size: 1.1rem;
-  margin: 0.25rem 0 0; /* a little gap above, none elsewhere */
+  margin: 0.25rem 0 0;
+}
+
+/* ---------- Add form (used from step 2) ---------- */
+
+/* Flexbox lays children out in a row. The input grows (flex: 1),
+   the button keeps its natural width. */
+.add-task {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.add-task input {
+  flex: 1;
+  font: inherit; /* use the page font, not the browser's default */
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.add-task button {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.7rem 1.1rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+
+/* ---------- Task list ---------- */
+
+/* Remove the bullet points and default indent of <ul>. */
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.task {
+  display: flex;
+  align-items: center; /* vertically centre everything in the row */
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+/* The checkbox + title area takes all spare space, so the delete
+   button is pushed to the right edge. */
+.task-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.task-main input {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--accent); /* colours the tick */
+}
+
+/* A done task: line through the title and quieter colour. */
+.task.done .task-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.delete {
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 0.2rem 0.5rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.delete:hover {
+  color: var(--text);
+}
+
+.empty,
+.count {
+  color: var(--muted);
 }
