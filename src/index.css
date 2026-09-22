@@ -1,0 +1,61 @@
+/*
+  index.css — styles for the whole of Dagen.
+
+  Colours are stored once as "custom properties" (the --names below)
+  and reused everywhere with var(--name). Change a colour here and it
+  changes across the whole app. Later phases add more of them.
+*/
+
+:root {
+  /* Light mode colours (the default) */
+  --bg: #f7f7f5; /* page background */
+  --text: #1f1f1f; /* main text */
+  --muted: #6b6b6b; /* quieter text, like the date */
+
+  /* The system font of whatever device you're on: San Francisco on
+     Mac and iPhone, Roboto on Android, Segoe on Windows. */
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* If the device is set to dark mode, swap in dark colours.
+   Only the tokens change; everything that uses them follows. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151515;
+    --text: #ededed;
+    --muted: #9a9a9a;
+  }
+}
+
+/* Make widths include padding and borders. Saves a lot of layout surprises. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Browsers add a small margin around the page by default; remove it. */
+body {
+  margin: 0;
+}
+
+/* The main column: never wider than about 40 characters x 16px,
+   centred, with breathing room so text never touches the screen edge. */
+.app {
+  max-width: 40rem;
+  margin: 0 auto; /* 0 top/bottom, "auto" left/right = centred */
+  padding: 2rem 1.25rem; /* 2rem top/bottom, 1.25rem left/right */
+}
+
+h1 {
+  font-size: 2.5rem; /* rem = relative to the base text size (usually 16px) */
+  margin: 0;
+}
+
+.today {
+  color: var(--muted);
+  font-size: 1.1rem;
+  margin: 0.25rem 0 0; /* a little gap above, none elsewhere */
+}
