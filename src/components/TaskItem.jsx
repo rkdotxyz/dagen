@@ -1,16 +1,39 @@
 /*
   TaskItem.jsx — one row in the task list.
 
-  It receives a single task from App (through "props") and shows it.
-  In this first step it only displays; ticking and deleting come in step 2.
+  Shows a task with a checkbox and a delete button. It never changes
+  the task itself: it tells App what happened (onToggle, onDelete)
+  and App updates the list. One place owns the data.
 */
 
-// Props arrive as one object. { task } picks out the "task" part,
-// so we can write task.title instead of props.task.title.
-function TaskItem({ task }) {
+function TaskItem({ task, onToggle, onDelete }) {
+  const isDone = task.status === 'done'
+
   return (
-    <li className="task">
-      <span className="task-title">{task.title}</span>
+    // Two class names when done ("task done"), one otherwise.
+    // The CSS for .task.done draws the line through the title.
+    <li className={isDone ? 'task done' : 'task'}>
+      {/* Wrapping the checkbox and title in <label> makes the
+          whole title tappable, not just the tiny box. */}
+      <label className="task-main">
+        <input
+          type="checkbox"
+          checked={isDone}
+          onChange={() => onToggle(task.id)}
+        />
+        <span className="task-title">{task.title}</span>
+      </label>
+
+      {/* type="button" so it never acts like a form submit.
+          aria-label gives screen readers a proper name for "×". */}
+      <button
+        type="button"
+        className="delete"
+        onClick={() => onDelete(task.id)}
+        aria-label={`Delete ${task.title}`}
+      >
+        ×
+      </button>
     </li>
   )
 }
