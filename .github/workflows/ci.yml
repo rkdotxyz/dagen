@@ -1,0 +1,43 @@
+# ci.yml — a GitHub Actions workflow.
+#
+# GitHub reads every .yml file in .github/workflows/ and runs it when the
+# events under "on" happen. This one checks the project on a fresh
+# computer in GitHub's cloud: install, lint, test, build. If any step
+# fails, the whole check turns red on the pull request.
+#
+# YAML rules: indentation (spaces, never tabs) shows what belongs to what.
+# "- " starts an item in a list. "#" starts a comment.
+
+name: CI # the name shown in the Actions tab
+
+on:
+  pull_request: # every pull request...
+    branches: [main] # ...that wants to merge into main
+  push:
+    branches: [main] # and every change that lands on main
+
+jobs:
+  check: # an id for this job; any name works
+    name: Lint, test and build # the name shown on pull requests
+    runs-on: ubuntu-latest # a fresh Linux computer, wiped after each run
+
+    steps:
+      # 1. Download this repository onto the fresh computer.
+      #    "uses:" runs a ready-made action someone published; @v7 is its version.
+      - uses: actions/checkout@v7
+
+      # 2. Install Node.js 24, and keep a cache of downloaded packages so
+      #    the next run installs faster.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # 3. Install exactly the versions in package-lock.json.
+      #    "npm ci" is the strict version of "npm install" made for this.
+      - run: npm ci
+
+      # 4. The same commands you run on your Mac. "run:" types a command.
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
