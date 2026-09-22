@@ -1,34 +1,45 @@
 /*
   App.jsx — the main component of Dagen.
 
-  Right now it only shows the app's name and today's date.
-  In Phase 1 this file becomes the home of your task list.
+  Step 1: show a list of tasks from a fixed ("hard-coded") array.
+  Nothing can change yet; that needs state, which arrives in step 2.
 */
 
-// A component is just a function that returns what should appear on screen.
-// Its name starts with a capital letter so React knows it's a component.
+// Borrow the TaskItem component from its own file.
+import TaskItem from './components/TaskItem.jsx'
+
+// A fixed list for now. Each task is an object: a set of named values.
+// The shape matches the plan: id, title and status. More fields come later.
+const sampleTasks = [
+  { id: 't1', title: 'Laundry', status: 'todo' },
+  { id: 't2', title: 'Cook dinner', status: 'todo' },
+  { id: 't3', title: 'Read DM2601 notes', status: 'done' },
+]
+
 function App() {
-  // new Date() is "this exact moment".
-  // toLocaleDateString(...) turns that moment into readable text.
-  // 'en-GB' means British English order: "Friday 18 September".
   const today = new Date().toLocaleDateString('en-GB', {
-    weekday: 'long', // full day name, e.g. "Friday"
-    day: 'numeric', // day of the month as a number, e.g. "18"
-    month: 'long', // full month name, e.g. "September"
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
   })
 
-  // Everything inside return ( ... ) is JSX: HTML-like tags inside JavaScript.
-  // It must have ONE outer tag, which is why everything sits inside <main>.
   return (
-    // "className" instead of "class": class is a reserved word in JavaScript.
-    // The names here match the styles in index.css.
     <main className="app">
-      <h1>Dagen</h1>
-      {/* Curly braces switch back to JavaScript and insert a value. */}
-      <p className="today">{today}</p>
+      <header className="app-header">
+        <h1>Dagen</h1>
+        <p className="today">{today}</p>
+      </header>
+
+      {/* <ul> is an unordered list. For every task in the array,
+          .map() makes one <TaskItem>. "key" is a unique label React
+          uses to tell the rows apart when the list changes. */}
+      <ul className="task-list">
+        {sampleTasks.map((task) => (
+          <TaskItem key={task.id} task={task} />
+        ))}
+      </ul>
     </main>
   )
 }
 
-// Make App available to other files. main.jsx imports it and draws it.
 export default App
