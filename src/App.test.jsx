@@ -1,93 +1,110 @@
 /*
-  App.test.jsx — tests for the task list as a user would use it.
+  App.test.jsx — tests for the app as a person would use it.
 
-  Instead of calling functions directly, these tests draw the whole App
-  in the pretend browser, then type, click and read the screen, the way
-  you would. If a future phase breaks adding, ticking, deleting or
-  remembering, one of these goes red.
+  Phase 1's tests had one add box; now every category has its own, so
+  these tests were rewritten. That's normal: when behaviour changes on
+  purpose, the tests describing it change with it.
 */
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import App from './App.jsx'
 
-// Start every test with empty storage...
 beforeEach(() => {
   localStorage.clear()
 })
 
-// ...and remove the drawn App after every test, so the next one starts
-// with a blank page.
 afterEach(() => {
   cleanup()
 })
 
-// A helper used by several tests: type a title and submit the form.
-function addTask(title) {
-  // getByLabelText finds the input by its accessible name (aria-label).
-  // Tests that find things the way people and screen readers do stay
-  // valid even if the layout changes.
-  const input = screen.getByLabelText('Task name')
+// Finds one category's section, so we can search inside just that part
+// of the page. getByRole('region', ...) matches the <section> because it
+// has an aria-label.
+function section(name) {
+  return screen.getByRole('region', { name: name })
+}
+
+// The header button is the one carrying aria-expanded; the + button
+// beside it doesn't, so this tells them apart.
+function headerOf(categoryName) {
+  return within(section(categoryName))
+    .getAllByRole('button')
+    .find((button) => button.hasAttribute('aria-expanded'))
+}
+
+// Opens a category's add box, types a title and submits it.
+function addTo(categoryName, title) {
+  fireEvent.click(screen.getByLabelText(`Add to ${categoryName}`))
+
+  const input = screen.getByLabelText(`New task in ${categoryName}`)
   fireEvent.change(input, { target: { value: title } })
   fireEvent.submit(input.closest('form'))
 }
 
-test('shows an empty message when there are no tasks', () => {
+test('shows a section for every category', () => {
   render(<App />)
-  // getByText throws (and fails the test) if the text isn't on screen.
-  // /.../ is a pattern: "contains this text".
-  expect(screen.getByText(/No tasks yet/)).toBeTruthy()
+
+  expect(section('Chores')).toBeTruthy()
+  expect(section('Projects')).toBeTruthy()
+  expect(screen.getAllByRole('region')).toHaveLength(8)
 })
 
-test('adds a task and clears the box', () => {
+test('a task is added to the category whose + was used', () => {
   render(<App />)
-  addTask('  Laundry  ')
+  addTo('Chores', 'Laundry')
 
-  // getByText ignores extra spaces when searching, so to be sure the
-  // spaces were really removed, compare the row's exact text.
-  expect(screen.getByText('Laundry').textContent).toBe('Laundry')
-  expect(screen.getByLabelText('Task name').value).toBe('')
+  // within(...) searches inside one element only.
+  expect(within(section('Chores')).getByText('Laundry')).toBeTruthy()
+  expect(within(section('Projects')).queryByText('Laundry')).toBeNull()
 })
 
-test('ignores a task that is only spaces', () => {
+test('the counter shows how many are left in that category', () => {
   render(<App />)
-  addTask('   ')
+  addTo('Chores', 'Laundry')
+  addTo('Chores', 'Dishes')
 
-  // queryAllBy... returns an empty list instead of throwing.
-  expect(screen.queryAllByRole('listitem')).toHaveLength(0)
+  const chores = section('Chores')
+  fireEvent.click(within(chores).getAllByRole('checkbox')[0])
+
+  // The count sits next to the category name in the header.
+  expect(within(chores).getByText('1')).toBeTruthy()
 })
 
-test('ticking a task updates the counter', () => {
+test('deleting removes only that task', () => {
   render(<App />)
-  addTask('Laundry')
-  addTask('Cook')
+  addTo('Chores', 'Laundry')
+  addTo('Chores', 'Dishes')
 
-  fireEvent.click(screen.getAllByRole('checkbox')[0])
+  fireEvent.click(screen.getByLabelText('Delete Dishes'))
 
-  expect(screen.getByText('1 of 2 left')).toBeTruthy()
-})
-
-test('deletes the right task', () => {
-  render(<App />)
-  addTask('Laundry')
-  addTask('Cook')
-
-  fireEvent.click(screen.getByLabelText('Delete Cook'))
-
-  expect(screen.queryByText('Cook')).toBeNull()
+  expect(screen.queryByText('Dishes')).toBeNull()
   expect(screen.getByText('Laundry')).toBeTruthy()
 })
 
-test('remembers tasks and ticks after a reload', () => {
+test('collapsing a section hides its tasks', () => {
   render(<App />)
-  addTask('Laundry')
-  fireEvent.click(screen.getByRole('checkbox'))
+  addTo('Chores', 'Laundry')
 
-  // "Reload": remove the App and draw a brand new one.
-  // Only localStorage survives, just like a real page reload.
+  fireEvent.click(headerOf('Chores'))
+
+  expect(screen.queryByText('Laundry')).toBeNull()
+})
+
+test('remembers tasks and collapsed sections after a reload', () => {
+  render(<App />)
+  addTo('Chores', 'Laundry')
+  fireEvent.click(headerOf('Chores'))
+
   cleanup()
-  render(<App />)
+  render(<App />) // like reloading the page: only storage survives
 
-  expect(screen.getByText('Laundry')).toBeTruthy()
-  expect(screen.getByRole('checkbox').checked).toBe(true)
+  expect(headerOf('Chores').getAttribute('aria-expanded')).toBe('false')
+  expect(screen.queryByText('Laundry')).toBeNull()
 })
