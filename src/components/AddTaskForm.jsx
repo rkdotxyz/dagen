@@ -1,46 +1,47 @@
 /*
-  AddTaskForm.jsx — the text box and button for adding a task.
+  AddTaskForm.jsx — the little text box inside a category section.
 
-  It keeps track of what you're typing (its own small piece of state)
-  and, when you submit, hands the title to App through onAdd.
-  It doesn't know where tasks are stored; that's App's job.
+  It doesn't know which category it belongs to; it only knows the name to
+  show and who to tell when a task is typed. The section it sits in
+  handles the rest.
 */
 
 import { useState } from 'react'
 
-// onAdd is a function App passes in: "call this with the new title".
-function AddTaskForm({ onAdd }) {
-  // State: a value React remembers between redraws.
-  // title = current text; setTitle = the only way to change it.
-  // '' (empty text) is the starting value.
+function AddTaskForm({ categoryName, onAdd, onCancel }) {
   const [title, setTitle] = useState('')
 
-  // Runs when the form is submitted: clicking Add or pressing Enter.
   function handleSubmit(event) {
-    // Browsers reload the page when a form is submitted.
-    // preventDefault() stops that, so React stays in charge.
-    event.preventDefault()
-
-    // trim() removes spaces at the start and end: "  Laundry " -> "Laundry"
+    event.preventDefault() // stop the browser reloading the page
     const trimmed = title.trim()
-    if (trimmed === '') return // ignore empty tasks
+    if (trimmed === '') return
 
-    onAdd(trimmed) // tell App about the new task
-    setTitle('') // clear the box for the next one
+    onAdd(trimmed)
+    setTitle('') // ready for the next one, so you can add several in a row
+  }
+
+  function handleKeyDown(event) {
+    // Escape closes the box without adding anything.
+    if (event.key === 'Escape') onCancel()
   }
 
   return (
     <form className="add-task" onSubmit={handleSubmit}>
-      {/* A "controlled input": its text always comes from state (value),
-          and every keystroke updates state (onChange). */}
       <input
         type="text"
         value={title}
         onChange={(event) => setTitle(event.target.value)}
-        placeholder="Add a task"
-        aria-label="Task name"
+        onKeyDown={handleKeyDown}
+        placeholder={`Add to ${categoryName}`}
+        aria-label={`New task in ${categoryName}`}
+        // autoFocus puts the cursor in the box as soon as it appears,
+        // so you can tap + and start typing.
+        autoFocus
       />
       <button type="submit">Add</button>
+      <button type="button" className="ghost" onClick={onCancel}>
+        Done
+      </button>
     </form>
   )
 }
