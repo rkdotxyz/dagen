@@ -2,18 +2,18 @@
   index.css — styles for the whole of Dagen.
 
   Colours live once as tokens (the --names) and are reused with var(--name).
-  Dark mode only swaps the tokens. This file already includes the styles
-  for the add form and ticked tasks you'll build in step 2.
+  Dark mode only swaps the tokens. Category colours are NOT here: they come
+  from config.js, because Google Calendar has to agree with them.
 */
 
 :root {
-  --bg: #f7f7f5; /* page background */
-  --surface: #ffffff; /* rows and inputs */
-  --text: #1f1f1f; /* main text */
-  --muted: #6b6b6b; /* quieter text */
-  --line: #e2e2de; /* thin borders */
-  --accent: #0b6e7f; /* buttons and ticks (Google's "Peacock" family) */
-  --accent-text: #ffffff; /* text on top of the accent colour */
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --text: #1f1f1f;
+  --muted: #6b6b6b;
+  --line: #e2e2de;
+  --accent: #0b6e7f;
+  --accent-text: #ffffff;
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
@@ -42,11 +42,10 @@ body {
   margin: 0;
 }
 
-/* The main column: centred, never too wide, padded from screen edges. */
 .app {
   max-width: 40rem;
   margin: 0 auto;
-  padding: 2rem 1.25rem;
+  padding: 2rem 1.25rem 4rem;
 }
 
 .app-header {
@@ -64,20 +63,93 @@ h1 {
   margin: 0.25rem 0 0;
 }
 
-/* ---------- Add form (used from step 2) ---------- */
+/* ---------- Category sections ---------- */
 
-/* Flexbox lays children out in a row. The input grows (flex: 1),
-   the button keeps its natural width. */
+.category {
+  margin-bottom: 1.5rem;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0.6rem;
+}
+
+/* The folding header. It's a <button>, so reset the button look. */
+.category-toggle {
+  flex: 1; /* take all the space, pushing + to the right */
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5rem 0.2rem;
+  border: 0;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* The category's colour: a small round dot. The colour itself is set in
+   the component, from config.js. */
+.dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%; /* half of the width = a circle */
+  flex-shrink: 0; /* never squash it when space is tight */
+}
+
+.category-count {
+  color: var(--muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums; /* digits keep a steady width */
+}
+
+/* A folded section: turn the little arrow. ::after adds the arrow
+   without putting it in the HTML. */
+.category-toggle::after {
+  content: '▾';
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.category-toggle[aria-expanded='false']::after {
+  transform: rotate(-90deg);
+}
+
+.add-button {
+  font: inherit;
+  font-size: 1.4rem;
+  line-height: 1;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.add-button:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* ---------- Add form ---------- */
+
 .add-task {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.6rem;
 }
 
 .add-task input {
   flex: 1;
-  font: inherit; /* use the page font, not the browser's default */
-  padding: 0.7rem 0.9rem;
+  font: inherit;
+  padding: 0.6rem 0.8rem;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
@@ -87,7 +159,7 @@ h1 {
 .add-task button {
   font: inherit;
   font-weight: 600;
-  padding: 0.7rem 1.1rem;
+  padding: 0.6rem 1rem;
   border: 0;
   border-radius: 10px;
   background: var(--accent);
@@ -95,9 +167,15 @@ h1 {
   cursor: pointer;
 }
 
-/* ---------- Task list ---------- */
+/* A quieter second button, for "Done". */
+.add-task .ghost {
+  background: none;
+  color: var(--muted);
+  font-weight: 400;
+}
 
-/* Remove the bullet points and default indent of <ul>. */
+/* ---------- Tasks ---------- */
+
 .task-list {
   list-style: none;
   margin: 0;
@@ -106,17 +184,15 @@ h1 {
 
 .task {
   display: flex;
-  align-items: center; /* vertically centre everything in the row */
+  align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 0.9rem;
-  margin-bottom: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 0.4rem;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
 }
 
-/* The checkbox + title area takes all spare space, so the delete
-   button is pushed to the right edge. */
 .task-main {
   flex: 1;
   display: flex;
@@ -128,10 +204,9 @@ h1 {
 .task-main input {
   width: 1.2rem;
   height: 1.2rem;
-  accent-color: var(--accent); /* colours the tick */
+  accent-color: var(--accent);
 }
 
-/* A done task: line through the title and quieter colour. */
 .task.done .task-title {
   text-decoration: line-through;
   color: var(--muted);
@@ -151,7 +226,8 @@ h1 {
   color: var(--text);
 }
 
-.empty,
-.count {
+.empty {
   color: var(--muted);
+  font-size: 0.95rem;
+  margin: 0.2rem 0 0.6rem 0.2rem;
 }

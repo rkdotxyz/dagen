@@ -1,8 +1,9 @@
 # Dagen
+![CI](https://github.com/rkdotxyz/dagen/actions/workflows/ci.yml/badge.svg)
 
 *Dagen* is Swedish for "the day". A phone-friendly planner: tasks live in colour-coded categories, every task gets a time, and each one appears in Google Calendar.
 
-**Status:** Phase 1 of 10 in progress: a task list saved in the browser.
+**Status:** Phase 3 of 10 in progress: categories and colours.
 
 ## Run it locally
 
@@ -14,7 +15,7 @@ Then open http://localhost:5173
 ## Roadmap
 
 - [x] Phase 0: Setup, GitHub and Vercel
-- [ ] Phase 1: Task list
+- [x] Phase 1: Task list
 - [ ] Phase 2: Automated checks (GitHub Actions)
 - [ ] Phase 3: Categories and colours
 - [ ] Phase 4: The + create flow

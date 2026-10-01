@@ -1,42 +1,70 @@
 /*
   storage.test.js — tests for src/lib/storage.js.
 
-  A test is a small program that uses your code and checks the result.
-  Vitest finds every file ending in .test.js / .test.jsx and runs it.
-
-  These are "unit tests": they test one small piece (save and load)
-  on its own, without drawing any screens.
+  Unit tests: they check one small piece on its own, with no screens drawn.
 */
 
 import { beforeEach, describe, expect, test } from 'vitest'
-import { loadTasks, saveTasks } from './storage.js'
+import { DEFAULT_CATEGORY_ID } from '../config.js'
+import { loadCollapsed, loadTasks, saveCollapsed, saveTasks } from './storage.js'
 
-// describe(...) groups related tests under one heading in the results.
-describe('storage', () => {
-  // beforeEach runs before EVERY test below. Wiping storage first means
-  // each test starts from the same clean state and can't affect the others.
+describe('tasks in storage', () => {
   beforeEach(() => {
     localStorage.clear()
   })
 
-  // test('what should happen', () => { ...code that checks it... })
   test('returns an empty list when nothing is saved', () => {
-    // expect(actual).toEqual(expected) fails the test if they differ.
     expect(loadTasks()).toEqual([])
   })
 
   test('loads back exactly what was saved', () => {
     const tasks = [
-      { id: 'a', title: 'Laundry', status: 'todo' },
-      { id: 'b', title: 'Cook', status: 'done' },
+      { id: 'a', title: 'Laundry', categoryId: 'chores', status: 'todo' },
+      { id: 'b', title: 'Cook', categoryId: 'meals', status: 'done' },
     ]
     saveTasks(tasks)
     expect(loadTasks()).toEqual(tasks)
   })
 
+  test('gives Phase 1 tasks the default category', () => {
+    // A task saved before categories existed: no categoryId at all.
+    localStorage.setItem(
+      'dagen.tasks.v1',
+      JSON.stringify([{ id: 'old', title: 'Laundry', status: 'todo' }]),
+    )
+
+    expect(loadTasks()[0].categoryId).toBe(DEFAULT_CATEGORY_ID)
+  })
+
+  test('rescues a task whose category no longer exists', () => {
+    // You renamed or removed "oldstuff" in config.js; the task stays.
+    localStorage.setItem(
+      'dagen.tasks.v1',
+      JSON.stringify([
+        { id: 'x', title: 'Fix bike', categoryId: 'oldstuff', status: 'todo' },
+      ]),
+    )
+
+    expect(loadTasks()[0].categoryId).toBe(DEFAULT_CATEGORY_ID)
+  })
+
   test('returns an empty list instead of crashing on damaged data', () => {
-    // Put broken text where the list should be, like a half-written save.
     localStorage.setItem('dagen.tasks.v1', '{not valid json')
     expect(loadTasks()).toEqual([])
+  })
+})
+
+describe('collapsed sections in storage', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  test('nothing is collapsed to begin with', () => {
+    expect(loadCollapsed()).toEqual([])
+  })
+
+  test('loads back the ids that were saved', () => {
+    saveCollapsed(['chores', 'social'])
+    expect(loadCollapsed()).toEqual(['chores', 'social'])
   })
 })
