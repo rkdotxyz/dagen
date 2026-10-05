@@ -2,11 +2,18 @@ import { describe, expect, test } from 'vitest'
 import {
   DURATIONS,
   QUARTER_TIMES,
+  addDays,
+  dayNumber,
   endTime,
+  formatMonthLabel,
   formatDay,
   formatDuration,
   formatRange,
   makeStart,
+  shiftStart,
+  startOfWeek,
+  weekDays,
+  weekdayLetter,
   nextQuarter,
   splitStart,
   toISODate,
@@ -40,6 +47,44 @@ describe('days', () => {
   test('crosses a month end when naming tomorrow', () => {
     const now = new Date(2026, 9, 31, 12, 0)
     expect(formatDay('2026-11-01', now)).toBe('Tomorrow')
+  })
+})
+
+describe('weeks', () => {
+  test('moves days forwards and backwards', () => {
+    expect(addDays('2026-10-05', 1)).toBe('2026-10-06')
+    expect(addDays('2026-10-05', -1)).toBe('2026-10-04')
+  })
+
+  test('crosses month and year ends', () => {
+    expect(addDays('2026-10-31', 1)).toBe('2026-11-01')
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29') // a leap year
+  })
+
+  test('weeks start on Monday', () => {
+    // 2026-10-05 is a Monday, 2026-10-11 the Sunday after it.
+    expect(startOfWeek('2026-10-05')).toBe('2026-10-05')
+    expect(startOfWeek('2026-10-08')).toBe('2026-10-05')
+    expect(startOfWeek('2026-10-11')).toBe('2026-10-05')
+  })
+
+  test('a week is seven days, Monday to Sunday', () => {
+    const days = weekDays('2026-10-08')
+    expect(days).toHaveLength(7)
+    expect(days[0]).toBe('2026-10-05')
+    expect(days[6]).toBe('2026-10-11')
+  })
+
+  test('labels the days for the strip', () => {
+    expect(dayNumber('2026-10-05')).toBe('5')
+    expect(weekdayLetter('2026-10-05')).toBe('M')
+    expect(weekdayLetter('2026-10-11')).toBe('S')
+  })
+
+  test('names the month, or both when the week straddles two', () => {
+    expect(formatMonthLabel(weekDays('2026-10-08'))).toBe('October 2026')
+    expect(formatMonthLabel(weekDays('2026-09-30'))).toBe('Sept – Oct 2026') // en-GB abbreviates September as "Sept"
   })
 })
 
@@ -82,6 +127,16 @@ describe('starts and durations', () => {
 
   test('formats a range', () => {
     expect(formatRange('2026-10-05T14:30', 90)).toBe('14:30–16:00')
+  })
+
+  test('shifts a start by minutes', () => {
+    expect(shiftStart('2026-10-05T14:30', 60)).toBe('2026-10-05T15:30')
+    expect(shiftStart('2026-10-05T14:30', 15)).toBe('2026-10-05T14:45')
+  })
+
+  test('shifting past midnight changes the day', () => {
+    expect(shiftStart('2026-10-05T23:30', 60)).toBe('2026-10-06T00:30')
+    expect(shiftStart('2026-10-05T00:30', -60)).toBe('2026-10-04T23:30')
   })
 
   test('formats durations in hours and minutes', () => {

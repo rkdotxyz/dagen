@@ -81,6 +81,16 @@ export function endTime(start, durationMin) {
   return toTime(toMinutes(time) + durationMin)
 }
 
+// Moves a start forwards or backwards by some minutes, rolling into the
+// next or previous day when it needs to: "23:30" + 60 minutes becomes
+// "00:30" on the following day. Math.floor rounds DOWN, which is what
+// makes going backwards past midnight work too.
+export function shiftStart(start, minutes) {
+  const { day, time } = splitStart(start)
+  const total = toMinutes(time) + minutes
+  return makeStart(addDays(day, Math.floor(total / 1440)), toTime(total))
+}
+
 // "14:30–16:00" (an en dash, the one used for ranges)
 export function formatRange(start, durationMin) {
   return `${splitStart(start).time}–${endTime(start, durationMin)}`
@@ -93,6 +103,64 @@ export function formatDuration(durationMin) {
   if (hours === 0) return `${minutes}m`
   if (minutes === 0) return `${hours}h`
   return `${hours}h ${minutes}m`
+}
+
+// Moves a day forwards or backwards. Going through a real Date means
+// month ends, leap years and the clock change are handled for us:
+// addDays('2026-10-31', 1) is '2026-11-01'.
+export function addDays(day, amount) {
+  const [year, month, date] = day.split('-').map(Number)
+  const moved = new Date(year, month - 1, date)
+  moved.setDate(moved.getDate() + amount)
+  return toISODate(moved)
+}
+
+// The Monday of the week a day belongs to.
+// getDay() counts from Sunday (0), but Dagen's weeks start on Monday.
+// (getDay() + 6) % 7 shifts that: Monday becomes 0, Sunday becomes 6.
+export function startOfWeek(day) {
+  const [year, month, date] = day.split('-').map(Number)
+  const weekday = (new Date(year, month - 1, date).getDay() + 6) % 7
+  return addDays(day, -weekday)
+}
+
+// The seven days of that week, Monday first.
+export function weekDays(day) {
+  const monday = startOfWeek(day)
+  return [0, 1, 2, 3, 4, 5, 6].map((offset) => addDays(monday, offset))
+}
+
+// Turns a day into a real Date, without the browser guessing a time zone
+// from text. Used by the two label helpers below.
+function toDate(day) {
+  const [year, month, date] = day.split('-').map(Number)
+  return new Date(year, month - 1, date)
+}
+
+// "5" — the day of the month, for the week strip.
+export function dayNumber(day) {
+  return String(toDate(day).getDate())
+}
+
+// "M", "T", "W"... the one-letter weekday heading.
+export function weekdayLetter(day) {
+  return toDate(day).toLocaleDateString('en-GB', { weekday: 'narrow' })
+}
+
+// The heading above the strip: "October 2026", or "Sep – Oct 2026" when
+// the week straddles two months.
+export function formatMonthLabel(days) {
+  const first = toDate(days[0])
+  const last = toDate(days[days.length - 1])
+  const year = last.getFullYear()
+
+  if (first.getMonth() === last.getMonth()) {
+    return `${first.toLocaleDateString('en-GB', { month: 'long' })} ${year}`
+  }
+
+  const from = first.toLocaleDateString('en-GB', { month: 'short' })
+  const to = last.toLocaleDateString('en-GB', { month: 'short' })
+  return `${from} – ${to} ${year}`
 }
 
 // "Today", "Tomorrow", or "Sat 10 Oct" for anything further away.
