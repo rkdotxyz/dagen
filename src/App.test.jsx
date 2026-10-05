@@ -1,8 +1,9 @@
 /*
   App.test.jsx — tests for the app as a person would use it.
 
-  Every task now has a day, a time and a length, so the helper below
-  fills the whole form: title, time, duration chip, then Add.
+  Sections now show only the day the week strip is on, so several tests
+  move between days first. The helpers at the top hide that plumbing, so
+  each test reads as the sentence it's checking.
 */
 
 import {
@@ -14,7 +15,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import App from './App.jsx'
-import { formatDuration, todayISO } from './lib/dates.js'
+import { addDays, formatDuration, todayISO } from './lib/dates.js'
 
 beforeEach(() => {
   localStorage.clear()
@@ -26,6 +27,15 @@ afterEach(() => {
 
 function section(name) {
   return screen.getByRole('region', { name: name })
+}
+
+// The week strip's days are named the way a screen reader hears them:
+// "Today", "Tomorrow, 2 tasks", "Sat 10 Oct, has a clash". A pattern
+// matches the start of the name, so markers don't break the lookup.
+function dayButton(namePattern) {
+  return within(screen.getByRole('navigation', { name: 'Week' })).getByLabelText(
+    namePattern,
+  )
 }
 
 function headerOf(categoryName) {
@@ -63,6 +73,114 @@ function addTo(categoryName, { title, time, durationMin = 30, day, keepOpen }) {
 
   if (!keepOpen) fireEvent.click(form.getByRole('button', { name: 'Done' }))
 }
+
+test('the strip shows this week, with today marked', () => {
+  render(<App />)
+
+  const strip = within(screen.getByRole('navigation', { name: 'Week' }))
+  expect(strip.getAllByRole('button', { name: /Today|Tomorrow|\d/ }).length).toBeGreaterThan(6)
+  expect(dayButton(/^Today/).getAttribute('aria-current')).toBe('date')
+  expect(dayButton(/^Today/).getAttribute('aria-pressed')).toBe('true')
+})
+
+test('only the selected day\'s tasks are shown', () => {
+  render(<App />)
+  addTo('Chores', { title: 'Laundry', time: '10:00' })
+  addTo('Chores', { title: 'Tomorrow laundry', time: '10:00', day: addDays(todayISO(), 1) })
+
+  expect(screen.getByText('Laundry')).toBeTruthy()
+  expect(screen.queryByText('Tomorrow laundry')).toBeNull()
+
+  fireEvent.click(dayButton(/^Tomorrow/))
+
+  expect(screen.getByText('Tomorrow laundry')).toBeTruthy()
+  expect(screen.queryByText(/^Laundry$/)).toBeNull()
+})
+
+test('a new task lands on the day you are looking at', () => {
+  render(<App />)
+  fireEvent.click(dayButton(/^Tomorrow/))
+
+  fireEvent.click(screen.getByLabelText('Add to Chores'))
+
+  expect(within(section('Chores')).getByLabelText('Day').value).toBe(
+    addDays(todayISO(), 1),
+  )
+})
+
+test('the strip marks days that have tasks, and days that clash', () => {
+  render(<App />)
+  addTo('Chores', { title: 'Laundry', time: '10:00', durationMin: 60 })
+
+  expect(dayButton(/^Today, 1 tasks/)).toBeTruthy()
+
+  addTo('Chores', { title: 'Dishes', time: '10:30' })
+
+  expect(dayButton(/^Today, 2 tasks, has a clash/)).toBeTruthy()
+})
+
+test('the arrows move a week at a time, and Today comes back', () => {
+  render(<App />)
+  addTo('Chores', { title: 'Laundry', time: '10:00' })
+
+  fireEvent.click(screen.getByLabelText('Next week'))
+  expect(screen.queryByText('Laundry')).toBeNull()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Today' }))
+  expect(screen.getByText('Laundry')).toBeTruthy()
+})
+
+test('swiping the strip moves a week', () => {
+  render(<App />)
+  addTo('Chores', { title: 'Laundry', time: '10:00' })
+
+  const strip = screen.getByRole('navigation', { name: 'Week' })
+  // A touch that travels 120 pixels to the left: forward one week.
+  fireEvent.touchStart(strip, { changedTouches: [{ clientX: 200 }] })
+  fireEvent.touchEnd(strip, { changedTouches: [{ clientX: 80 }] })
+
+  expect(screen.queryByText('Laundry')).toBeNull()
+})
+
+test('editing a task moves it, and clears the clash on both', () => {
+  render(<App />)
+  addTo('Chores', { title: 'Laundry', time: '10:00', durationMin: 60 })
+  addTo('Chores', { title: 'Dishes', time: '10:30' })
+  expect(screen.getAllByText(/Overlaps/)).toHaveLength(2)
+
+  fireEvent.click(screen.getByLabelText('Edit Dishes'))
+  // The +1h chip moves the whole task without touching the fields.
+  fireEvent.click(within(section('Chores')).getByRole('button', { name: '+1h' }))
+  fireEvent.click(within(section('Chores')).getByRole('button', { name: 'Save' }))
+
+  expect(screen.queryByText(/Overlaps/)).toBeNull()
+  expect(within(section('Chores')).getByText(/11:30–12:00/)).toBeTruthy()
+})
+
+test('editing can move a task to another day', () => {
+  render(<App />)
+  addTo('Chores', { title: 'Laundry', time: '10:00' })
+
+  fireEvent.click(screen.getByLabelText('Edit Laundry'))
+  fireEvent.click(within(section('Chores')).getByRole('button', { name: 'Tomorrow' }))
+  fireEvent.click(within(section('Chores')).getByRole('button', { name: 'Save' }))
+
+  expect(screen.queryByText('Laundry')).toBeNull()
+
+  fireEvent.click(dayButton(/^Tomorrow/))
+  expect(screen.getByText('Laundry')).toBeTruthy()
+})
+
+test('cancelling an edit changes nothing', () => {
+  render(<App />)
+  addTo('Chores', { title: 'Laundry', time: '10:00' })
+
+  fireEvent.click(screen.getByLabelText('Edit Laundry'))
+  fireEvent.click(within(section('Chores')).getByRole('button', { name: '+1h' }))
+  fireEvent.click(within(section('Chores')).getByRole('button', { name: 'Cancel' }))
+
+  expect(within(section('Chores')).getByText(/10:00–10:30/)).toBeTruthy()
+})
 
 test('a task shows its day and time range', () => {
   render(<App />)
@@ -141,8 +259,16 @@ test('ticking a task off frees its slot', () => {
 test('a clash on another day is not a clash', () => {
   render(<App />)
   addTo('Chores', { title: 'Laundry', time: '10:00', durationMin: 60 })
-  addTo('Chores', { title: 'Dishes', time: '10:00', durationMin: 60, day: '2026-12-24' })
+  addTo('Chores', {
+    title: 'Dishes',
+    time: '10:00',
+    durationMin: 60,
+    day: addDays(todayISO(), 1),
+  })
 
+  expect(screen.queryByText(/Overlaps/)).toBeNull()
+
+  fireEvent.click(dayButton(/^Tomorrow/))
   expect(screen.queryByText(/Overlaps/)).toBeNull()
 })
 
