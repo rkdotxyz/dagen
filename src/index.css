@@ -5,8 +5,8 @@
   Dark mode only swaps the tokens. Category colours are NOT here: they come
   from config.js, because Google Calendar has to agree with them.
 
-  New in this phase: the add form, the duration chips, and the amber
-  --warn colour used for overlaps.
+  New in this phase: the week strip across the top, and the small buttons
+  at the right end of each task row.
 */
 
 :root {
@@ -66,6 +66,98 @@ h1 {
   color: var(--muted);
   font-size: 1.1rem;
   margin: 0.25rem 0 0;
+}
+
+/* ---------- Week strip ---------- */
+
+.week-strip {
+  margin-bottom: 1.5rem;
+}
+
+.week-head {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+
+.week-head button {
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0.3rem 0.6rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.month-label {
+  font-weight: 600;
+}
+
+/* Pushes the Today button to the far right of the row. */
+.today-button {
+  margin-left: auto;
+  font-size: 0.9rem !important;
+}
+
+/* Seven equal columns, whatever the screen width.
+   1fr means "one share of the space", so all seven stay the same size. */
+.week-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.4rem 0;
+  font: inherit;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.day-letter {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.day-number {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A fixed-height line under the number, so days with and without a dot
+   are exactly the same height and nothing jumps as you move around. */
+.day-marks {
+  height: 0.8rem;
+  line-height: 0.8rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* Today, even when you're looking at another day. */
+.day[aria-current='date'] .day-number {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.day.selected {
+  background: var(--accent);
+}
+
+.day.selected .day-letter,
+.day.selected .day-number,
+.day.selected .day-marks {
+  color: var(--accent-text);
 }
 
 /* ---------- Category sections ---------- */
@@ -311,18 +403,22 @@ h1 {
   color: var(--muted);
 }
 
-.delete {
-  font-size: 1.3rem;
+.row-button {
+  font-size: 1.1rem;
   line-height: 1;
-  padding: 0.2rem 0.5rem;
+  padding: 0.3rem 0.45rem;
   border: 0;
   background: none;
   color: var(--muted);
   cursor: pointer;
 }
 
-.delete:hover {
+.row-button:hover {
   color: var(--text);
+}
+
+.delete {
+  font-size: 1.3rem;
 }
 
 .empty {
