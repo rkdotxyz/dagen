@@ -1,12 +1,13 @@
 /*
   storage.js — saves and loads what the app needs to remember.
 
-  Four things now: the tasks, which category sections you collapsed, your
-  recurring chore templates, and the days you deleted a chore on. Each has
-  its own key, so one can't damage another.
+  Five things now: the tasks, which category sections you collapsed, your
+  recurring chore templates, the days you deleted a chore on, and what has
+  been sent to Google Calendar. Each has its own key, so one can't damage
+  another.
 
-  Three of them are plain lists, so one pair of helpers at the bottom
-  serves all of them.
+  Three of them are plain lists and share one pair of helpers. The last is
+  a lookup from task id to event, so it gets its own pair.
 
   In a later phase this file will talk to a cloud database instead, and
   nothing else in the app will need to change.
@@ -19,6 +20,7 @@ const TASKS_KEY = 'dagen.tasks.v1'
 const COLLAPSED_KEY = 'dagen.collapsed.v1'
 const TEMPLATES_KEY = 'dagen.templates.v1'
 const SKIPPED_KEY = 'dagen.skipped.v1'
+const SENT_KEY = 'dagen.calendar.v1'
 
 // Old saves are brought up to date as they load. This is a "migration":
 // old data, new shape. Two of them now:
@@ -121,4 +123,27 @@ export function loadSkipped() {
 
 export function saveSkipped(keys) {
   saveList(SKIPPED_KEY, keys)
+}
+
+// What Google Calendar already knows: { taskId: { eventId, signature } }.
+// An object rather than a list, because it's looked up by task id.
+export function loadSent() {
+  try {
+    const saved = localStorage.getItem(SENT_KEY)
+    if (!saved) return {}
+
+    const parsed = JSON.parse(saved)
+    // typeof null is also "object", so check for null separately.
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+export function saveSent(sent) {
+  try {
+    localStorage.setItem(SENT_KEY, JSON.stringify(sent))
+  } catch {
+    // Worst case Dagen forgets what it sent and makes the events again.
+  }
 }

@@ -9,12 +9,15 @@
 
 import { useEffect, useState } from 'react'
 import AccountBar from './components/AccountBar.jsx'
+import CalendarBar from './components/CalendarBar.jsx'
 import CategorySection from './components/CategorySection.jsx'
 import TemplatePanel from './components/TemplatePanel.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
-import { CATEGORIES } from './config.js'
+import { CATEGORIES, getCategory } from './config.js'
+import { applyPlan, isEmptyPlan, planSync } from './lib/calendarSync.js'
 import { loadPlanner, savePlanner } from './lib/cloud.js'
 import { conflictsById } from './lib/conflicts.js'
+import { createEvent, deleteEvent, updateEvent } from './lib/googleCalendar.js'
 import { missingTasks, skipKey } from './lib/recurring.js'
 import { isConfigured, supabase } from './lib/supabase.js'
 import {
@@ -28,14 +31,25 @@ import {
 } from './lib/dates.js'
 import {
   loadCollapsed,
+  loadSent,
   loadSkipped,
   loadTasks,
   loadTemplates,
   saveCollapsed,
+  saveSent,
   saveSkipped,
   saveTasks,
   saveTemplates,
 } from './lib/storage.js'
+
+// What Dagen asks Google for. "calendar.events" is permission to make and
+// change events; "calendar.readonly" is for Phase 9, when the conflict
+// check starts reading your lectures. Asking for both now means one trip
+// through Google's consent screen instead of two.
+const CALENDAR_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.readonly',
+].join(' ')
 
 function makeId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -97,6 +111,10 @@ function App() {
   // Who's signed in, or null. Supabase calls this a session.
   const [session, setSession] = useState(null)
   const [syncing, setSyncing] = useState(false)
+  // What Google Calendar already knows about, and how it's going.
+  const [sent, setSent] = useState(() => loadSent())
+  const [sending, setSending] = useState(false)
+  const [failures, setFailures] = useState(0)
 
   useEffect(() => {
     saveTasks(tasks)
@@ -113,6 +131,10 @@ function App() {
   useEffect(() => {
     saveSkipped(skipped)
   }, [skipped])
+
+  useEffect(() => {
+    saveSent(sent)
+  }, [sent])
 
   // Ask Supabase who's signed in, then listen for changes: signing in,
   // signing out, or a session restored when you reopen the app.
@@ -185,6 +207,40 @@ function App() {
     return () => clearTimeout(timer)
   }, [session, tasks, templates, skipped, collapsed])
 
+
+  // The permission to touch your calendar, handed over by Google when you
+  // connect. It lives on the session, and lasts about an hour.
+  const calendarToken = session?.provider_token ?? null
+
+  // Send changes to Google: work out the plan, carry it out, remember what
+  // was sent. The wait lets a burst of edits settle into one round.
+  useEffect(() => {
+    if (!calendarToken) return
+
+    const timer = setTimeout(async () => {
+      const plan = planSync(sent, tasks)
+      if (isEmptyPlan(plan)) return
+
+      setSending(true)
+
+      // The three functions, with the token already filled in, so
+      // calendarSync.js never has to know about tokens.
+      const api = {
+        createEvent: (task, category) => createEvent(calendarToken, task, category),
+        updateEvent: (eventId, task, category) =>
+          updateEvent(calendarToken, eventId, task, category),
+        deleteEvent: (eventId) => deleteEvent(calendarToken, eventId),
+      }
+
+      const result = await applyPlan(api, plan, sent, getCategory)
+
+      setSent(result.sent)
+      setFailures(result.failures)
+      setSending(false)
+    }, 1200)
+
+    return () => clearTimeout(timer)
+  }, [calendarToken, tasks, sent])
 
   function addTask(categoryId, details) {
     setTasks([...tasks, { id: makeId(), categoryId: categoryId, status: 'todo', ...details }])
@@ -278,6 +334,25 @@ function App() {
           })
         }
         onSignOut={() => supabase.auth.signOut()}
+      />
+
+      <CalendarBar
+        session={session}
+        token={calendarToken}
+        failures={failures}
+        sending={sending}
+        onConnect={() =>
+          supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              scopes: CALENDAR_SCOPES,
+              // Ask Google to show the permission screen even if you've
+              // approved before, so connecting always actually connects.
+              queryParams: { access_type: 'offline', prompt: 'consent' },
+              redirectTo: window.location.origin,
+            },
+          })
+        }
       />
 
       {showTemplates && (
