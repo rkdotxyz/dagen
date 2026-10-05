@@ -3,19 +3,25 @@
   anything is wrong with that plan.
 
   It still changes nothing itself. It reports taps upwards and draws what
-  it's given, including the list of tasks it clashes with. Editing is the
-  same: it only says which task you tapped; the section swaps the row for
-  a form.
+  it's given. Since Phase 10 the row is a sketched card, and the controls
+  inside it are drawably's: real inputs and buttons underneath, with a pen
+  drawing layered behind them.
 */
 
+import {
+  DrawablyBadge,
+  DrawablyButton,
+  DrawablyCard,
+  DrawablyCheckbox,
+} from 'drawably/react'
 import { formatDay, formatRange, splitStart } from '../lib/dates.js'
 
 function TaskItem({ task, conflicts, onToggle, onEdit, onDelete }) {
   const isDone = task.status === 'done'
   const { day } = splitStart(task.start)
 
-  // Build the row's class names from its state. filter(Boolean) drops the
-  // false ones, so "task done clash" or just "task" comes out.
+  // The row's state as class names. The CSS uses "clash" and "done" to
+  // change the pen colour of everything drawn inside the row.
   const classNames = [
     'task',
     isDone && 'done',
@@ -27,52 +33,59 @@ function TaskItem({ task, conflicts, onToggle, onEdit, onDelete }) {
 
   return (
     <li className={classNames}>
-      <label className="task-main">
-        <input type="checkbox" checked={isDone} onChange={() => onToggle(task.id)} />
+      <DrawablyCard className="task-card">
+        <label className="task-main">
+          <DrawablyCheckbox checked={isDone} onChange={() => onToggle(task.id)} />
 
-        <span className="task-text">
-          <span className="task-title">
-            {/* The tilde marks a time that may still move. Phase 8 puts
-                the same mark in front of the Google Calendar event. */}
-            {task.tentative && <span className="tilde">~ </span>}
-            {task.title}
-          </span>
-
-          <span className="task-when">
-            {formatDay(day)} · {formatRange(task.start, task.durationMin)}
-          </span>
-
-          {conflicts.length > 0 && (
-            <span className="clash-note">
-              ⚠ Overlaps{' '}
-              {conflicts
-                .map((other) => `${other.title} ${formatRange(other.start, other.durationMin)}`)
-                .join(', ')}
+          <span className="task-text">
+            <span className="task-title">
+              {/* The tilde marks a time that may still move, now in a
+                  little sketched tag. Google gets the same mark. */}
+              {/* The gap after the tag comes from CSS (.tilde), not a
+                  space character: a space here would end up in the title's
+                  text for every task, tentative or not. */}
+              {task.tentative && <DrawablyBadge className="tilde">~</DrawablyBadge>}
+              {task.title}
             </span>
-          )}
-        </span>
-      </label>
 
-      {/* Two small buttons at the right end of the row. aria-label gives
-          each a name of its own, so "Edit Laundry" and "Edit Dishes" can
-          never be confused, by a person or by a test. */}
-      <button
-        type="button"
-        className="row-button"
-        onClick={() => onEdit(task.id)}
-        aria-label={`Edit ${task.title}`}
-      >
-        ✎
-      </button>
+            <span className="task-when">
+              {formatDay(day)} · {formatRange(task.start, task.durationMin)}
+            </span>
 
-      <button
-        type="button"
-        className="row-button delete"
-        onClick={() => onDelete(task.id)}
-        aria-label={`Delete ${task.title}`}
-      >
-        ×
-      </button>
+            {conflicts.length > 0 && (
+              <span className="clash-note">
+                ⚠ Overlaps{' '}
+                {conflicts
+                  .map(
+                    (other) =>
+                      `${other.title} ${formatRange(other.start, other.durationMin)}`,
+                  )
+                  .join(', ')}
+              </span>
+            )}
+          </span>
+        </label>
+
+        {/* Words instead of symbols: the pen font draws letters, and has
+            no pencil or multiplication sign. The aria-labels are what
+            screen readers (and the tests) use, and they haven't changed. */}
+        <DrawablyButton
+          className="row-button"
+          onClick={() => onEdit(task.id)}
+          aria-label={`Edit ${task.title}`}
+        >
+          edit
+        </DrawablyButton>
+
+        <DrawablyButton
+          className="row-button"
+          tone="danger"
+          onClick={() => onDelete(task.id)}
+          aria-label={`Delete ${task.title}`}
+        >
+          x
+        </DrawablyButton>
+      </DrawablyCard>
     </li>
   )
 }
