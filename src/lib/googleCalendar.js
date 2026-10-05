@@ -8,11 +8,20 @@
   Dagen writes to your MAIN calendar ("primary") and only ever touches
   events it made. Each event carries the task's id in a hidden field, so
   the app can always recognise its own work.
+
+  Since Phase 9 it also reads: what changed in your own calendar, and
+  what else is booked on the day you're looking at.
 */
 
 import { shiftStart } from './dates.js'
 
-const BASE = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+const API = 'https://www.googleapis.com/calendar/v3'
+
+// The events of one calendar. encodeURIComponent because calendar ids
+// contain @ and other characters that mean something in a web address.
+function eventsUrl(calendarId = 'primary') {
+  return `${API}/calendars/${encodeURIComponent(calendarId)}/events`
+}
 
 // The time zone this device is in, e.g. "Europe/Stockholm". Sending it
 // with each event is what keeps 18:00 at 18:00 across the clock change
@@ -74,7 +83,7 @@ async function request(token, url, options = {}) {
 
 // Makes the event and hands back the id Google gave it.
 export async function createEvent(token, task, category) {
-  const event = await request(token, BASE, {
+  const event = await request(token, eventsUrl(), {
     method: 'POST',
     body: JSON.stringify(toEvent(task, category)),
   })
@@ -85,12 +94,59 @@ export async function createEvent(token, task, category) {
 // Replaces the event's details. PUT rather than PATCH: we always send
 // the whole event, so there's nothing left over from an older version.
 export async function updateEvent(token, eventId, task, category) {
-  return request(token, `${BASE}/${eventId}`, {
+  return request(token, `${eventsUrl()}/${eventId}`, {
     method: 'PUT',
     body: JSON.stringify(toEvent(task, category)),
   })
 }
 
 export async function deleteEvent(token, eventId) {
-  return request(token, `${BASE}/${eventId}`, { method: 'DELETE' })
+  return request(token, `${eventsUrl()}/${eventId}`, { method: 'DELETE' })
+}
+
+// ---- reading ----
+
+// Everything in your main calendar that changed since a moment in time.
+// showDeleted brings back the ones removed over there, as "cancelled";
+// singleEvents turns a repeating event into its individual days, which
+// is the only shape Dagen understands.
+export async function listChangedEvents(token, updatedMin) {
+  const params = new URLSearchParams({
+    singleEvents: 'true',
+    showDeleted: 'true',
+    maxResults: '250',
+    updatedMin: updatedMin,
+  })
+
+  const data = await request(token, `${eventsUrl()}?${params}`)
+  return data?.items ?? []
+}
+
+// Everything booked on one day in one calendar, used by the conflict
+// check. The two moments are built from the day at local midnight, then
+// turned into the exact format Google wants.
+export async function listDayEvents(token, calendarId, day) {
+  const params = new URLSearchParams({
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    timeMin: new Date(`${day}T00:00:00`).toISOString(),
+    timeMax: new Date(`${day}T23:59:59.999`).toISOString(),
+  })
+
+  const data = await request(token, `${eventsUrl(calendarId)}?${params}`)
+  return data?.items ?? []
+}
+
+// The calendars you can see, so you can choose which ones count as busy.
+export async function listCalendars(token) {
+  const data = await request(
+    token,
+    `${API}/users/me/calendarList?minAccessRole=reader&maxResults=100`,
+  )
+
+  return (data?.items ?? []).map((calendar) => ({
+    id: calendar.id,
+    name: calendar.summary,
+    primary: Boolean(calendar.primary),
+  }))
 }

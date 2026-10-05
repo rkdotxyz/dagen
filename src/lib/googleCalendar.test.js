@@ -8,6 +8,9 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   createEvent,
   deleteEvent,
+  listCalendars,
+  listChangedEvents,
+  listDayEvents,
   toEvent,
   updateEvent,
 } from './googleCalendar.js'
@@ -97,6 +100,46 @@ describe('requests', () => {
 
     // No error: 410 means Google deleted it long ago, which is fine.
     await expect(deleteEvent('token-123', 'event-1')).resolves.toBeNull()
+  })
+
+  test('listChangedEvents asks for everything since a moment, deleted ones included', async () => {
+    const fetched = fakeFetch({ body: { items: [{ id: 'event-1' }] } })
+
+    const events = await listChangedEvents('token-123', '2026-10-05T10:00:00.000Z')
+
+    expect(events).toEqual([{ id: 'event-1' }])
+    const [url] = fetched.mock.calls[0]
+    expect(url).toContain('updatedMin=2026-10-05T10%3A00%3A00.000Z')
+    expect(url).toContain('showDeleted=true')
+    expect(url).toContain('singleEvents=true')
+  })
+
+  test('listDayEvents asks one calendar for one day', async () => {
+    const fetched = fakeFetch({ body: { items: [] } })
+
+    await listDayEvents('token-123', 'ht26@group.calendar.google.com', '2026-10-05')
+
+    const [url] = fetched.mock.calls[0]
+    // The calendar id is escaped, so the @ can't break the address.
+    expect(url).toContain('ht26%40group.calendar.google.com')
+    expect(url).toContain('timeMin=')
+    expect(url).toContain('timeMax=')
+  })
+
+  test('listCalendars returns the ones you can read', async () => {
+    fakeFetch({
+      body: {
+        items: [
+          { id: 'primary-id', summary: 'Rama Krushna Behera', primary: true },
+          { id: 'ht26', summary: 'HT26 LP1-2 Semester' },
+        ],
+      },
+    })
+
+    expect(await listCalendars('token-123')).toEqual([
+      { id: 'primary-id', name: 'Rama Krushna Behera', primary: true },
+      { id: 'ht26', name: 'HT26 LP1-2 Semester', primary: false },
+    ])
   })
 
   test('a real failure is reported, not swallowed', async () => {
