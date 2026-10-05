@@ -3,7 +3,7 @@
 
 *Dagen* is Swedish for "the day". A phone-friendly planner: tasks live in colour-coded categories, every task gets a time, and each one appears in Google Calendar.
 
-**Status:** Phase 3 of 10 in progress: categories and colours.
+**Status:** Phase 4 of 10 in progress: the full add flow with times, durations and conflict warnings.
 
 ## Run it locally
 
@@ -16,8 +16,8 @@ Then open http://localhost:5173
 
 - [x] Phase 0: Setup, GitHub and Vercel
 - [x] Phase 1: Task list
-- [ ] Phase 2: Automated checks (GitHub Actions)
-- [ ] Phase 3: Categories and colours
+- [x] Phase 2: Automated checks (GitHub Actions)
+- [x] Phase 3: Categories and colours
 - [ ] Phase 4: The + create flow
 - [ ] Phase 5: Week strip and task actions
 - [ ] Phase 6: Recurring chores (v1.0)
