@@ -7,7 +7,16 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { DEFAULT_CATEGORY_ID } from '../config.js'
 import { todayISO } from './dates.js'
-import { loadCollapsed, loadTasks, saveCollapsed, saveTasks } from './storage.js'
+import {
+  loadCollapsed,
+  loadSkipped,
+  loadTasks,
+  loadTemplates,
+  saveCollapsed,
+  saveSkipped,
+  saveTasks,
+  saveTemplates,
+} from './storage.js'
 
 describe('tasks in storage', () => {
   beforeEach(() => {
@@ -117,5 +126,39 @@ describe('collapsed sections in storage', () => {
   test('loads back the ids that were saved', () => {
     saveCollapsed(['chores', 'social'])
     expect(loadCollapsed()).toEqual(['chores', 'social'])
+  })
+})
+
+describe('templates and skipped chores', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  test('start empty', () => {
+    expect(loadTemplates()).toEqual([])
+    expect(loadSkipped()).toEqual([])
+  })
+
+  test('load back what was saved', () => {
+    const cook = {
+      id: 'cook',
+      title: 'Cook dinner',
+      categoryId: 'meals',
+      repeat: 'daily',
+      time: '18:00',
+      durationMin: 60,
+    }
+    saveTemplates([cook])
+    saveSkipped(['cook:2026-10-05'])
+
+    expect(loadTemplates()).toEqual([cook])
+    expect(loadSkipped()).toEqual(['cook:2026-10-05'])
+  })
+
+  test('are kept apart from each other', () => {
+    saveTemplates([{ id: 'cook' }])
+    // Saving one list must not wipe another.
+    expect(loadSkipped()).toEqual([])
+    expect(loadCollapsed()).toEqual([])
   })
 })
