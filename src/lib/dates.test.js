@@ -13,6 +13,7 @@ import {
   shiftStart,
   startOfWeek,
   weekDays,
+  weekdayIndex,
   weekdayLetter,
   nextQuarter,
   splitStart,
@@ -74,6 +75,12 @@ describe('weeks', () => {
     expect(days).toHaveLength(7)
     expect(days[0]).toBe('2026-10-05')
     expect(days[6]).toBe('2026-10-11')
+  })
+
+  test('counts weekdays from Monday', () => {
+    expect(weekdayIndex('2026-10-05')).toBe(0) // a Monday
+    expect(weekdayIndex('2026-10-10')).toBe(5) // the Saturday after
+    expect(weekdayIndex('2026-10-11')).toBe(6) // Sunday is last, not first
   })
 
   test('labels the days for the strip', () => {

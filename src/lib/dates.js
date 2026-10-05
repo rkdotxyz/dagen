@@ -124,6 +124,24 @@ export function startOfWeek(day) {
   return addDays(day, -weekday)
 }
 
+// Which day of the week this is, counting Monday as 0 and Sunday as 6.
+// Used by weekly chores: "every Saturday" is weekday 5.
+export function weekdayIndex(day) {
+  const [year, month, date] = day.split('-').map(Number)
+  return (new Date(year, month - 1, date).getDay() + 6) % 7
+}
+
+// The names of the weekdays, in Dagen's Monday-first order.
+export const WEEKDAY_NAMES = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+]
+
 // The seven days of that week, Monday first.
 export function weekDays(day) {
   const monday = startOfWeek(day)
