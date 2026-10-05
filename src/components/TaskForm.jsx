@@ -1,12 +1,10 @@
 /*
-  TaskForm.jsx — the add panel inside a category section.
+  TaskForm.jsx — one panel used for two jobs: adding a task, and editing
+  one that exists. Pass it a task and it fills itself in and says "Save";
+  pass none and it starts empty on the day you're looking at and says "Add".
 
-  Four decisions, in the order you make them: what, when, how long, and
-  is the time firm. The day starts as today and the time as the next
-  quarter hour, so most tasks need only a title and a tap on Add.
-
-  While you choose, it checks the time against your other tasks and shows
-  what it would clash with. It never blocks you: a clash is information.
+  Writing it once means the rules about times can't drift apart between
+  an "add" screen and an "edit" screen.
 */
 
 import { useState } from 'react'
@@ -14,42 +12,63 @@ import { findConflicts } from '../lib/conflicts.js'
 import {
   DURATIONS,
   QUARTER_TIMES,
+  addDays,
   endTime,
   formatDuration,
   formatRange,
   makeStart,
   nextQuarter,
-  todayISO,
+  shiftStart,
+  splitStart,
 } from '../lib/dates.js'
 
-function TaskForm({ categoryName, tasks, onAdd, onCancel }) {
-  const [title, setTitle] = useState('')
-  const [day, setDay] = useState(() => todayISO())
-  const [time, setTime] = useState(() => nextQuarter())
-  const [durationMin, setDurationMin] = useState(30)
-  const [tentative, setTentative] = useState(false)
+function TaskForm({ categoryName, tasks, task, defaultDay, onSubmit, onCancel }) {
+  // When editing, start from the task. When adding, start from sensible
+  // defaults. The ...() => shape means this runs once, not on every redraw.
+  const [title, setTitle] = useState(() => task?.title ?? '')
+  const [day, setDay] = useState(() => (task ? splitStart(task.start).day : defaultDay))
+  const [time, setTime] = useState(() =>
+    task ? splitStart(task.start).time : nextQuarter(),
+  )
+  const [durationMin, setDurationMin] = useState(() => task?.durationMin ?? 30)
+  const [tentative, setTentative] = useState(() => task?.tentative ?? false)
 
+  const isEditing = Boolean(task)
   const start = makeStart(day, time)
 
-  // A pretend task, so the same rule that flags saved tasks can check
-  // this one before it exists. The id can be anything no task has.
-  const draft = { id: 'draft', start: start, durationMin: durationMin, status: 'todo' }
+  // The task being edited must not count as clashing with itself, so the
+  // draft borrows its id. A new task uses an id no task can have.
+  const draft = {
+    id: task?.id ?? 'draft',
+    start: start,
+    durationMin: durationMin,
+    status: 'todo',
+  }
   const clashes = findConflicts(draft, tasks)
+
+  // The quick chips: move the whole task without touching the fields by hand.
+  function shiftBy(minutes) {
+    const moved = splitStart(shiftStart(start, minutes))
+    setDay(moved.day)
+    setTime(moved.time)
+  }
 
   function handleSubmit(event) {
     event.preventDefault()
     const trimmed = title.trim()
     if (trimmed === '') return
 
-    onAdd({
+    onSubmit({
       title: trimmed,
       start: start,
       durationMin: durationMin,
       tentative: tentative,
     })
 
-    // Ready for the next task: clear the title and move the clock to the
-    // end of the one just added, so a run of tasks stacks up naturally.
+    if (isEditing) return // the row goes back to normal; nothing to reset
+
+    // Adding: clear the title and move the clock to the end of the task
+    // just added, so a run of tasks stacks up naturally.
     setTitle('')
     setTime(endTime(start, durationMin))
   }
@@ -58,6 +77,8 @@ function TaskForm({ categoryName, tasks, onAdd, onCancel }) {
     if (event.key === 'Escape') onCancel()
   }
 
+  const label = isEditing ? `Edit ${task.title}` : `New task in ${categoryName}`
+
   return (
     <form className="task-form" onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
       <input
@@ -65,13 +86,11 @@ function TaskForm({ categoryName, tasks, onAdd, onCancel }) {
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         placeholder={`Add to ${categoryName}`}
-        aria-label={`New task in ${categoryName}`}
+        aria-label={label}
         autoFocus
       />
 
       <div className="form-row">
-        {/* type="date" gives you the browser's own date picker, and on a
-            phone the native one. Its value is already "YYYY-MM-DD". */}
         <input
           type="date"
           value={day}
@@ -79,8 +98,6 @@ function TaskForm({ categoryName, tasks, onAdd, onCancel }) {
           aria-label="Day"
         />
 
-        {/* A plain list of the 96 quarter hours, rather than type="time",
-            so nothing off the quarter can be typed in. */}
         <select
           value={time}
           onChange={(event) => setTime(event.target.value)}
@@ -99,8 +116,6 @@ function TaskForm({ categoryName, tasks, onAdd, onCancel }) {
           <button
             key={option}
             type="button"
-            // aria-pressed marks the chosen chip for screen readers, and
-            // the CSS uses it to highlight it. One attribute, two jobs.
             aria-pressed={option === durationMin}
             className="chip"
             onClick={() => setDurationMin(option)}
@@ -110,12 +125,24 @@ function TaskForm({ categoryName, tasks, onAdd, onCancel }) {
         ))}
       </div>
 
+      <div className="chips" role="group" aria-label="Move">
+        <button type="button" className="chip" onClick={() => shiftBy(15)}>
+          +15m
+        </button>
+        <button type="button" className="chip" onClick={() => shiftBy(60)}>
+          +1h
+        </button>
+        <button type="button" className="chip" onClick={() => setDay(addDays(day, 1))}>
+          Tomorrow
+        </button>
+      </div>
+
       <p className="form-summary">
         {formatRange(start, durationMin)}
         {clashes.length > 0 && (
           <span className="clash-note">
             {' '}
-            ⚠ Overlaps {clashes.map((task) => task.title).join(', ')}
+            ⚠ Overlaps {clashes.map((other) => other.title).join(', ')}
           </span>
         )}
       </p>
@@ -130,9 +157,9 @@ function TaskForm({ categoryName, tasks, onAdd, onCancel }) {
           Tentative
         </label>
 
-        <button type="submit">Add</button>
+        <button type="submit">{isEditing ? 'Save' : 'Add'}</button>
         <button type="button" className="ghost" onClick={onCancel}>
-          Done
+          {isEditing ? 'Cancel' : 'Done'}
         </button>
       </div>
     </form>

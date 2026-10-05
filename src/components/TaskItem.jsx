@@ -3,12 +3,14 @@
   anything is wrong with that plan.
 
   It still changes nothing itself. It reports taps upwards and draws what
-  it's given, including the list of tasks it clashes with.
+  it's given, including the list of tasks it clashes with. Editing is the
+  same: it only says which task you tapped; the section swaps the row for
+  a form.
 */
 
 import { formatDay, formatRange, splitStart } from '../lib/dates.js'
 
-function TaskItem({ task, conflicts, onToggle, onDelete }) {
+function TaskItem({ task, conflicts, onToggle, onEdit, onDelete }) {
   const isDone = task.status === 'done'
   const { day } = splitStart(task.start)
 
@@ -51,9 +53,21 @@ function TaskItem({ task, conflicts, onToggle, onDelete }) {
         </span>
       </label>
 
+      {/* Two small buttons at the right end of the row. aria-label gives
+          each a name of its own, so "Edit Laundry" and "Edit Dishes" can
+          never be confused, by a person or by a test. */}
       <button
         type="button"
-        className="delete"
+        className="row-button"
+        onClick={() => onEdit(task.id)}
+        aria-label={`Edit ${task.title}`}
+      >
+        ✎
+      </button>
+
+      <button
+        type="button"
+        className="row-button delete"
         onClick={() => onDelete(task.id)}
         aria-label={`Delete ${task.title}`}
       >
