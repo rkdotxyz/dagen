@@ -1,39 +1,60 @@
 /*
-  index.css — styles for the whole of Dagen.
+  index.css — Dagen as a blueprint.
 
-  Colours live once as tokens (the --names) and are reused with var(--name).
-  Dark mode only swaps the tokens. Category colours are NOT here: they come
-  from config.js, because Google Calendar has to agree with them.
+  Since Phase 10 the controls are drawn by drawably: every button, field,
+  checkbox and card is a real element with a pen sketch behind it. This
+  file sets the paper and the ink, lays things out, and leaves the drawing
+  to the library.
 
-  New in this phase: the account line under the title.
+  Blueprint means the usual roles swap: the PAPER is blue and the INK is
+  white. drawably reads both from CSS custom properties, so the whole
+  theme is the handful of lines in :root below.
+
+  Category colours still come from config.js, because Google Calendar has
+  to agree with them. They appear only as the solid dot by each category.
 */
 
 :root {
-  --bg: #f7f7f5;
-  --surface: #ffffff;
-  --text: #1f1f1f;
-  --muted: #6b6b6b;
-  --line: #e2e2de;
-  --accent: #0b6e7f;
-  --accent-text: #ffffff;
-  --warn: #b26a00; /* the amber of a conflict */
+  /* Dagen's own tokens */
+  --bg: #1b4b8a; /* blueprint blue: the paper */
+  --text: #ffffff; /* white: the ink */
+  --muted: rgba(255, 255, 255, 0.68); /* quieter ink */
+  --grid: rgba(255, 255, 255, 0.08); /* the faint drafting grid */
+  --warn: #ffd166; /* clashes: amber reads well on blue */
 
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* drawably's tokens: it draws with these */
+  --drawably-paper: var(--bg); /* behind fields, and text on solid buttons */
+  --drawably-stroke: var(--text); /* every pen line */
+  --drawably-fill: var(--text); /* solid buttons and checkmarks */
+  --drawably-error: #ff9c8f; /* a red light enough to read on blue */
+  --drawably-success: #b8f5c0;
+
+  /* Tells the browser this is a dark surface, so its own bits (the date
+     picker's icon, scrollbars) are drawn light rather than black. */
+  color-scheme: dark;
+
+  /* The pen font everywhere. It has letters, digits and basic
+     punctuation; anything it lacks (å, ä, ö, –, ·, ~, ⚠) quietly falls
+     back to the system font, one character at a time. */
+  font-family: 'Drawably Pen', system-ui, sans-serif;
+  font-size: 18px; /* a pen hand reads better a little larger */
   color: var(--text);
-  background: var(--bg);
+  background-color: var(--bg);
 }
 
+/* At night: a deeper, inkier blue. Only the paper changes. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #151515;
-    --surface: #1f1f1f;
-    --text: #ededed;
-    --muted: #9a9a9a;
-    --line: #2e2e2e;
-    --accent: #5cc8db;
-    --accent-text: #0d1f22;
-    --warn: #f0a85a;
+    --bg: #12355f;
   }
+}
+
+/* drawably sets Inter on its controls. Inheriting instead keeps the pen
+   font everywhere, as chosen. */
+.drawably-host,
+.drawably-button,
+.drawably-badge {
+  font-family: inherit;
 }
 
 *,
@@ -42,8 +63,22 @@
   box-sizing: border-box;
 }
 
+/* The drafting grid: two sets of 1px lines, one across and one down,
+   repeated every 24px. Pure CSS, no image. */
 body {
   margin: 0;
+  min-height: 100vh;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Plain buttons that aren't drawably controls (the day buttons, the
+   category headers) still need a visible focus ring for keyboard users. */
+button:focus-visible {
+  outline: 2px dashed var(--text);
+  outline-offset: 3px;
 }
 
 .app {
@@ -60,89 +95,37 @@ body {
   margin-bottom: 1.5rem;
 }
 
-/* Pushes the Repeats button to the right end of the header row. */
-.repeats-button {
-  margin-left: auto;
-  font: inherit;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.repeats-button[aria-expanded='true'] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
-}
-
-/* ---------- Recurring chores ---------- */
-
-.templates {
-  padding: 0.9rem;
-  margin-bottom: 1.5rem;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-
-.templates h2 {
-  font-size: 1rem;
-  margin: 0 0 0.6rem;
-}
-
-.template-list {
-  list-style: none;
-  margin: 0 0 0.6rem;
-  padding: 0;
-}
-
-.template {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.4rem 0;
-}
-
-.template-text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
 h1 {
-  font-size: 2.5rem;
+  font-size: 2.6rem;
+  font-weight: 400; /* the pen has one weight; bold would be faked */
   margin: 0;
 }
 
 .today {
   color: var(--muted);
-  font-size: 1.1rem;
-  margin: 0.25rem 0 0;
+  margin: 0;
 }
 
-/* ---------- Account line ---------- */
+.repeats-button {
+  margin-left: auto;
+}
+
+/* ---------- Account and calendar lines ---------- */
 
 .account {
   margin: -0.8rem 0 1.2rem;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
-/* A button that reads as a link: used for sign in and sign out. */
+/* A button that reads as a link. The underline is drawn by drawably. */
 .link {
   font: inherit;
   padding: 0;
   border: 0;
   background: none;
-  color: var(--accent);
-  text-decoration: underline;
+  color: var(--text);
   cursor: pointer;
-}
-
-.syncing {
-  font-style: italic;
 }
 
 /* ---------- Week strip ---------- */
@@ -154,34 +137,15 @@ h1 {
 .week-head {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  margin-bottom: 0.4rem;
-}
-
-.week-head button {
-  font: inherit;
-  font-size: 1.2rem;
-  line-height: 1;
-  padding: 0.3rem 0.6rem;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
 }
 
 .month-label {
-  font-weight: 600;
+  flex: 1;
+  text-align: center;
 }
 
-/* Pushes the Today button to the far right of the row. */
-.today-button {
-  margin-left: auto;
-  font-size: 0.9rem !important;
-}
-
-/* Seven equal columns, whatever the screen width.
-   1fr means "one share of the space", so all seven stay the same size. */
 .week-days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -192,100 +156,74 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.15rem;
+  gap: 0.2rem;
   padding: 0.4rem 0;
   font: inherit;
   border: 0;
-  border-radius: 10px;
   background: none;
   color: var(--text);
   cursor: pointer;
 }
 
 .day-letter {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 
 .day-number {
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-variant-numeric: tabular-nums;
+  padding: 0.1rem 0.35rem; /* room for the pen loop */
 }
 
-/* A fixed-height line under the number, so days with and without a dot
-   are exactly the same height and nothing jumps as you move around. */
+/* A fixed-height line under the number, so a dot appearing never makes
+   the row jump. */
 .day-marks {
   height: 0.8rem;
   line-height: 0.8rem;
-  font-size: 0.9rem;
   color: var(--muted);
-}
-
-/* Today, even when you're looking at another day. */
-.day[aria-current='date'] .day-number {
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.day.selected {
-  background: var(--accent);
-}
-
-.day.selected .day-letter,
-.day.selected .day-number,
-.day.selected .day-marks {
-  color: var(--accent-text);
 }
 
 /* ---------- Category sections ---------- */
 
 .category {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.75rem;
 }
 
 .category-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 0.6rem;
 }
 
-/* The folding header. It's a <button>, so reset the button look. */
 .category-toggle {
-  flex: 1; /* take all the space, pushing + to the right */
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 0.6rem;
   font: inherit;
-  font-weight: 600;
+  font-size: 1.1rem;
   text-align: left;
-  padding: 0.5rem 0.2rem;
+  padding: 0.4rem 0.2rem;
   border: 0;
   background: none;
   color: var(--text);
   cursor: pointer;
 }
 
-/* The category's colour: a small round dot. The colour itself is set in
-   the component, from config.js. */
+/* The category's Google colour, as a solid dot with a white ring. The
+   ring is what keeps Blueberry and Graphite visible on blue paper. */
 .dot {
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 50%; /* half of the width = a circle */
-  flex-shrink: 0; /* never squash it when space is tight */
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  border: 2px solid var(--text);
+  flex-shrink: 0;
 }
 
-.category-count {
-  color: var(--muted);
-  font-weight: 400;
-  font-variant-numeric: tabular-nums; /* digits keep a steady width */
-}
-
-/* A folded section: turn the little arrow. ::after adds the arrow
-   without putting it in the HTML. */
 .category-toggle::after {
   content: '▾';
+  margin-left: auto;
   color: var(--muted);
   transition: transform 0.15s ease;
 }
@@ -294,49 +232,40 @@ h1 {
   transform: rotate(-90deg);
 }
 
-.add-button {
-  font: inherit;
-  font-size: 1.4rem;
-  line-height: 1;
-  width: 2rem;
-  height: 2rem;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
+.category-rule {
+  margin: 0.2rem 0 0.8rem;
 }
 
-.add-button:hover {
-  background: var(--surface);
-  color: var(--text);
+/* ---------- Forms and panels ---------- */
+
+.form-card,
+.panel-card {
+  margin-bottom: 0.8rem;
 }
 
-/* ---------- Add form ---------- */
+.templates {
+  margin-bottom: 1.5rem;
+}
+
+.templates h2 {
+  font-size: 1.2rem;
+  font-weight: 400;
+  margin: 0 0 0.6rem;
+}
 
 .task-form {
   display: flex;
-  flex-direction: column; /* stack the rows instead of lining them up */
-  gap: 0.5rem;
-  padding: 0.8rem;
-  margin-bottom: 0.6rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  flex-direction: column;
+  gap: 0.7rem;
 }
 
-.task-form input[type='text'],
-.task-form input[type='date'],
-.task-form select {
-  font: inherit;
-  padding: 0.6rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--bg);
-  color: var(--text);
+/* A drawably field is an inline box by default; these make it fill its
+   row like a normal text box would. */
+.field {
+  display: block;
+  width: 100%;
 }
 
-/* A row of controls that wraps onto the next line on a narrow phone. */
 .form-row {
   display: flex;
   flex-wrap: wrap;
@@ -344,43 +273,11 @@ h1 {
   gap: 0.5rem;
 }
 
-.form-row input[type='date'] {
+.form-row .field {
   flex: 1;
-  min-width: 9rem;
+  min-width: 8rem;
+  width: auto;
 }
-
-.form-row button[type='submit'] {
-  font: inherit;
-  font-weight: 600;
-  padding: 0.6rem 1.1rem;
-  border: 0;
-  border-radius: 10px;
-  background: var(--accent);
-  color: var(--accent-text);
-  cursor: pointer;
-}
-
-.task-form .ghost {
-  font: inherit;
-  padding: 0.6rem 0.8rem;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-/* The tentative tickbox takes the spare space, pushing the two buttons
-   to the right end of the row. */
-.tentative-toggle {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-/* ---------- Duration chips ---------- */
 
 .chips {
   display: flex;
@@ -389,22 +286,7 @@ h1 {
 }
 
 .chip {
-  font: inherit;
   font-size: 0.9rem;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: 999px; /* a huge radius makes a pill shape */
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-}
-
-/* The chosen chip. [aria-pressed='true'] styles whichever one the
-   component marked as pressed: no extra class needed. */
-.chip[aria-pressed='true'] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
 }
 
 .form-summary {
@@ -413,11 +295,12 @@ h1 {
   font-size: 0.9rem;
 }
 
-/* ---------- Conflicts ---------- */
-
-.clash-note {
-  color: var(--warn);
-  font-size: 0.85rem;
+.tentative-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
 }
 
 /* ---------- Tasks ---------- */
@@ -429,29 +312,29 @@ h1 {
 }
 
 .task {
+  margin-bottom: 0.6rem;
+}
+
+/* The sketched card holds the whole row: tick, text, then two buttons. */
+.task-card {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0.9rem;
-  margin-bottom: 0.4rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
 }
 
 .task-main {
   flex: 1;
   display: flex;
-  align-items: flex-start; /* the tick lines up with the first line */
+  align-items: flex-start;
   gap: 0.75rem;
   cursor: pointer;
 }
 
-/* Title, time and any clash note, stacked. */
 .task-text {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.15rem;
 }
 
 .task-when {
@@ -459,20 +342,25 @@ h1 {
   font-size: 0.85rem;
 }
 
-/* The tilde marking a time that may still move. */
 .tilde {
-  color: var(--muted);
+  margin-right: 0.2rem;
 }
 
-/* A task that overlaps something: an amber edge down its left side. */
+.row-button {
+  font-size: 0.85rem;
+  padding: 2px 10px;
+}
+
+/* A row that clashes: everything drawn inside it switches to amber ink.
+   drawably reads --drawably-stroke from the nearest ancestor that sets
+   it, so one line here recolours the card, the tick and the buttons. */
 .task.clash {
-  border-left: 3px solid var(--warn);
+  --drawably-stroke: var(--warn);
 }
 
-.task-main input {
-  width: 1.2rem;
-  height: 1.2rem;
-  accent-color: var(--accent);
+/* A finished row: fainter ink, and a line through the title. */
+.task.done {
+  --drawably-stroke: var(--muted);
 }
 
 .task.done .task-title {
@@ -480,26 +368,34 @@ h1 {
   color: var(--muted);
 }
 
-.row-button {
-  font-size: 1.1rem;
-  line-height: 1;
-  padding: 0.3rem 0.45rem;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.row-button:hover {
-  color: var(--text);
-}
-
-.delete {
-  font-size: 1.3rem;
+.clash-note {
+  color: var(--warn);
+  font-size: 0.85rem;
 }
 
 .empty {
   color: var(--muted);
   font-size: 0.95rem;
   margin: 0.2rem 0 0.6rem 0.2rem;
+}
+
+/* ---------- Lists in panels ---------- */
+
+.template-list {
+  list-style: none;
+  margin: 0 0 0.8rem;
+  padding: 0;
+}
+
+.template {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+}
+
+.template-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
