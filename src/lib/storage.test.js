@@ -13,8 +13,12 @@ import {
   loadTasks,
   loadTemplates,
   saveCollapsed,
+  loadBusyCalendars,
   loadSent,
+  loadSyncedAt,
+  saveBusyCalendars,
   saveSent,
+  saveSyncedAt,
   saveSkipped,
   saveTasks,
   saveTemplates,
@@ -167,6 +171,20 @@ describe('templates and skipped chores', () => {
   test('a damaged calendar record becomes an empty one', () => {
     localStorage.setItem('dagen.calendar.v1', '["not", "an", "object"]')
     expect(loadSent()).toEqual({})
+  })
+
+  test('remembers when it last asked Google', () => {
+    expect(loadSyncedAt()).toBeNull()
+
+    saveSyncedAt('2026-10-05T10:00:00.000Z')
+    expect(loadSyncedAt()).toBe('2026-10-05T10:00:00.000Z')
+  })
+
+  test('remembers which calendars count as busy', () => {
+    expect(loadBusyCalendars()).toEqual([])
+
+    saveBusyCalendars(['primary', 'ht26'])
+    expect(loadBusyCalendars()).toEqual(['primary', 'ht26'])
   })
 
   test('are kept apart from each other', () => {
