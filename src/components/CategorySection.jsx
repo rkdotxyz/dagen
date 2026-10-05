@@ -1,19 +1,20 @@
 /*
-  CategorySection.jsx — one category: its coloured header, its tasks,
-  and its own add box.
+  CategorySection.jsx — one category: its coloured header, its tasks in
+  time order, and its own add panel.
 
-  It owns one small thing: whether its add box is open. Everything that
-  outlives a redraw (the tasks, which sections are collapsed) is owned by
-  App, so this component can stay simple.
+  It owns one small thing: whether its add panel is open. Everything that
+  outlives a redraw is owned by App.
 */
 
 import { useState } from 'react'
-import AddTaskForm from './AddTaskForm.jsx'
+import TaskForm from './TaskForm.jsx'
 import TaskItem from './TaskItem.jsx'
 
 function CategorySection({
   category,
   tasks,
+  allTasks,
+  conflicts,
   isCollapsed,
   onToggleCollapse,
   onAdd,
@@ -26,24 +27,18 @@ function CategorySection({
 
   function startAdding() {
     setIsAdding(true)
-    // Adding to a folded section would hide what you just typed, so open it.
     if (isCollapsed) onToggleCollapse(category.id)
   }
 
   return (
-    // aria-label names the section for screen readers (and for tests).
     <section className="category" aria-label={category.name}>
       <div className="category-header">
-        {/* The whole header is a button, so tapping anywhere folds it.
-            aria-expanded tells assistive tech whether it's open. */}
         <button
           type="button"
           className="category-toggle"
           onClick={() => onToggleCollapse(category.id)}
           aria-expanded={!isCollapsed}
         >
-          {/* The one place the category's colour is painted. style={{ }}:
-              the outer braces mean "JavaScript", the inner ones an object. */}
           <span className="dot" style={{ backgroundColor: category.hex }} />
           <span className="category-name">{category.name}</span>
           <span className="category-count">{remaining}</span>
@@ -59,15 +54,15 @@ function CategorySection({
         </button>
       </div>
 
-      {/* Collapsed means: draw the header, and nothing below it. */}
       {!isCollapsed && (
-        // <>...</> is a "fragment": a wrapper that groups things without
-        // adding an extra tag to the page.
         <>
           {isAdding && (
-            <AddTaskForm
+            <TaskForm
               categoryName={category.name}
-              onAdd={(title) => onAdd(category.id, title)}
+              // The form checks against EVERY task, not just this
+              // category's: a clash doesn't care which section it's in.
+              tasks={allTasks}
+              onAdd={(details) => onAdd(category.id, details)}
               onCancel={() => setIsAdding(false)}
             />
           )}
@@ -80,6 +75,9 @@ function CategorySection({
                 <TaskItem
                   key={task.id}
                   task={task}
+                  // ?? [] means "if there's no entry for this id, use an
+                  // empty list", so TaskItem never has to check for null.
+                  conflicts={conflicts[task.id] ?? []}
                   onToggle={onToggleTask}
                   onDelete={onDeleteTask}
                 />

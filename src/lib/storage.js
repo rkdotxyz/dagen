@@ -9,17 +9,35 @@
 */
 
 import { CATEGORIES, DEFAULT_CATEGORY_ID } from '../config.js'
+import { makeStart, todayISO } from './dates.js'
 
 const TASKS_KEY = 'dagen.tasks.v1'
 const COLLAPSED_KEY = 'dagen.collapsed.v1'
 
-// Tasks saved in Phase 1 have no categoryId, because categories didn't
-// exist yet, and a task can point at a category you later renamed or
-// removed in config.js. Either way, give it the default category as it's
-// loaded so it can't vanish. This is a "migration": old data, new shape.
-function withCategory(task) {
-  const exists = CATEGORIES.some((category) => category.id === task.categoryId)
-  return exists ? task : { ...task, categoryId: DEFAULT_CATEGORY_ID }
+// Old saves are brought up to date as they load. This is a "migration":
+// old data, new shape. Two of them now:
+//
+//   1. Phase 1 tasks have no categoryId (categories didn't exist), and a
+//      task can point at a category you later renamed in config.js.
+//      Either way it gets the default category, so it can't vanish.
+//   2. Tasks saved before this phase have no time at all. Rather than
+//      guess silently, they're put at 09:00 today for half an hour AND
+//      marked tentative, which is exactly what tentative means: a time
+//      that needs a second look.
+function migrate(task) {
+  const known = CATEGORIES.some((category) => category.id === task.categoryId)
+  const withCategory = known
+    ? task
+    : { ...task, categoryId: DEFAULT_CATEGORY_ID }
+
+  if (withCategory.start) return withCategory
+
+  return {
+    ...withCategory,
+    start: makeStart(todayISO(), '09:00'),
+    durationMin: 30,
+    tentative: true,
+  }
 }
 
 export function loadTasks() {
@@ -31,7 +49,7 @@ export function loadTasks() {
     // Someone could have put anything in storage. Only accept a real list.
     if (!Array.isArray(parsed)) return []
 
-    return parsed.map(withCategory)
+    return parsed.map(migrate)
   } catch {
     // Blocked storage or damaged text: start empty rather than crash.
     return []
