@@ -3,10 +3,18 @@
 
   Four states, and it says which one you're in rather than hiding it:
   not signed in at all, signed in but no calendar permission, connected,
-  and connected but something went wrong.
+  and connected but something went wrong. When connected it also opens the
+  list of calendars that count as busy.
 */
 
-function CalendarBar({ session, token, failures, sending, onConnect }) {
+function CalendarBar({
+  session,
+  token,
+  failures,
+  sending,
+  onConnect,
+  onChooseCalendars,
+}) {
   // No account at all: Phase 7's line already explains that.
   if (!session) return null
 
@@ -24,7 +32,10 @@ function CalendarBar({ session, token, failures, sending, onConnect }) {
   return (
     <p className="account">
       <span>In Google Calendar</span>
-      {sending && <span className="syncing"> · sending…</span>}
+      {sending && <span className="syncing"> · sending…</span>}{' '}
+      <button type="button" className="link" onClick={onChooseCalendars}>
+        Busy calendars
+      </button>
       {failures > 0 && (
         <span className="clash-note">
           {' '}

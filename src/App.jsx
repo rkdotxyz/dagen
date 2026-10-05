@@ -7,17 +7,27 @@
   tasks each section shows.
 */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AccountBar from './components/AccountBar.jsx'
 import CalendarBar from './components/CalendarBar.jsx'
+import CalendarPicker from './components/CalendarPicker.jsx'
 import CategorySection from './components/CategorySection.jsx'
 import TemplatePanel from './components/TemplatePanel.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
 import { CATEGORIES, getCategory } from './config.js'
-import { applyPlan, isEmptyPlan, planSync } from './lib/calendarSync.js'
+import { toBusyBlocks } from './lib/busy.js'
+import { applyPlan, isEmptyPlan, planSync, signatureOf } from './lib/calendarSync.js'
 import { loadPlanner, savePlanner } from './lib/cloud.js'
 import { conflictsById } from './lib/conflicts.js'
-import { createEvent, deleteEvent, updateEvent } from './lib/googleCalendar.js'
+import {
+  createEvent,
+  deleteEvent,
+  listCalendars,
+  listChangedEvents,
+  listDayEvents,
+  updateEvent,
+} from './lib/googleCalendar.js'
+import { applyIncoming } from './lib/incoming.js'
 import { missingTasks, skipKey } from './lib/recurring.js'
 import { isConfigured, supabase } from './lib/supabase.js'
 import {
@@ -30,13 +40,17 @@ import {
   weekDays,
 } from './lib/dates.js'
 import {
+  loadBusyCalendars,
   loadCollapsed,
   loadSent,
+  loadSyncedAt,
   loadSkipped,
   loadTasks,
   loadTemplates,
+  saveBusyCalendars,
   saveCollapsed,
   saveSent,
+  saveSyncedAt,
   saveSkipped,
   saveTasks,
   saveTemplates,
@@ -115,6 +129,12 @@ function App() {
   const [sent, setSent] = useState(() => loadSent())
   const [sending, setSending] = useState(false)
   const [failures, setFailures] = useState(0)
+  // What else is booked on the day you're looking at, and which
+  // calendars that comes from.
+  const [busy, setBusy] = useState([])
+  const [calendars, setCalendars] = useState([])
+  const [busyCalendars, setBusyCalendars] = useState(() => loadBusyCalendars())
+  const [showCalendars, setShowCalendars] = useState(false)
 
   useEffect(() => {
     saveTasks(tasks)
@@ -135,6 +155,19 @@ function App() {
   useEffect(() => {
     saveSent(sent)
   }, [sent])
+
+  useEffect(() => {
+    saveBusyCalendars(busyCalendars)
+  }, [busyCalendars])
+
+  // A mirror of the two lists that incoming changes need. Reading them
+  // through a ref means the sync below doesn't have to restart every time
+  // a task changes, and never works from a stale copy either.
+  const latest = useRef({ tasks: tasks, sent: sent })
+
+  useEffect(() => {
+    latest.current = { tasks: tasks, sent: sent }
+  }, [tasks, sent])
 
   // Ask Supabase who's signed in, then listen for changes: signing in,
   // signing out, or a session restored when you reopen the app.
@@ -242,6 +275,98 @@ function App() {
     return () => clearTimeout(timer)
   }, [calendarToken, tasks, sent])
 
+  // ---- changes made in Google Calendar, coming back ----
+  //
+  // Runs when the calendar is connected and whenever you come back to the
+  // app, which is exactly when something may have changed over there.
+  useEffect(() => {
+    if (!calendarToken) return
+
+    let active = true
+
+    async function pull() {
+      // The first time, look back a week. After that, only since the
+      // last look. The moment is noted BEFORE asking, so anything that
+      // changes while the request is in flight is caught next time.
+      const since =
+        loadSyncedAt() ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const askedAt = new Date().toISOString()
+
+      try {
+        const events = await listChangedEvents(calendarToken, since)
+        if (!active) return
+
+        const result = applyIncoming(
+          events,
+          latest.current.tasks,
+          latest.current.sent,
+          signatureOf,
+        )
+
+        if (result.applied > 0) {
+          setTasks(result.tasks)
+          setSent(result.sent)
+        }
+
+        saveSyncedAt(askedAt)
+      } catch (error) {
+        console.error('Could not read from Google Calendar:', error.message)
+      }
+    }
+
+    pull()
+
+    // "focus" fires when you switch back to the tab or reopen the app.
+    window.addEventListener('focus', pull)
+
+    return () => {
+      active = false
+      window.removeEventListener('focus', pull)
+    }
+  }, [calendarToken])
+
+  // The list of calendars you could mark as busy.
+  useEffect(() => {
+    if (!calendarToken) return
+
+    let active = true
+
+    listCalendars(calendarToken)
+      .then((found) => active && setCalendars(found))
+      .catch((error) => console.error('Could not list calendars:', error.message))
+
+    return () => {
+      active = false
+    }
+  }, [calendarToken])
+
+  // What else is booked on the day you're looking at. Fetched per day
+  // rather than per week: one day is what the sections show.
+  useEffect(() => {
+    if (!calendarToken || busyCalendars.length === 0) {
+      setBusy([])
+      return
+    }
+
+    let active = true
+
+    Promise.all(
+      busyCalendars.map((calendarId) =>
+        listDayEvents(calendarToken, calendarId, selectedDay).catch((error) => {
+          console.error('Could not read a calendar:', error.message)
+          return []
+        }),
+      ),
+    ).then((lists) => {
+      // .flat() turns a list of lists into one list.
+      if (active) setBusy(toBusyBlocks(lists.flat()))
+    })
+
+    return () => {
+      active = false
+    }
+  }, [calendarToken, busyCalendars, selectedDay])
+
   function addTask(categoryId, details) {
     setTasks([...tasks, { id: makeId(), categoryId: categoryId, status: 'todo', ...details }])
   }
@@ -297,7 +422,9 @@ function App() {
     )
   }
 
-  const conflicts = conflictsById(tasks)
+  // Lectures and meetings are judged by the same overlap rule as tasks:
+  // they're simply added to the list handed to it.
+  const conflicts = conflictsById([...tasks, ...busy])
   const days = weekDays(selectedDay)
   const markers = dayMarkers(tasks, conflicts)
 
@@ -341,6 +468,7 @@ function App() {
         token={calendarToken}
         failures={failures}
         sending={sending}
+        onChooseCalendars={() => setShowCalendars(!showCalendars)}
         onConnect={() =>
           supabase.auth.signInWithOAuth({
             provider: 'google',
@@ -354,6 +482,20 @@ function App() {
           })
         }
       />
+
+      {showCalendars && (
+        <CalendarPicker
+          calendars={calendars}
+          chosen={busyCalendars}
+          onToggle={(id) =>
+            setBusyCalendars(
+              busyCalendars.includes(id)
+                ? busyCalendars.filter((item) => item !== id)
+                : [...busyCalendars, id],
+            )
+          }
+        />
+      )}
 
       {showTemplates && (
         <TemplatePanel

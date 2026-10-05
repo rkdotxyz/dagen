@@ -21,6 +21,8 @@ const COLLAPSED_KEY = 'dagen.collapsed.v1'
 const TEMPLATES_KEY = 'dagen.templates.v1'
 const SKIPPED_KEY = 'dagen.skipped.v1'
 const SENT_KEY = 'dagen.calendar.v1'
+const SYNCED_AT_KEY = 'dagen.syncedAt.v1'
+const CALENDAR_IDS_KEY = 'dagen.busyCalendars.v1'
 
 // Old saves are brought up to date as they load. This is a "migration":
 // old data, new shape. Two of them now:
@@ -146,4 +148,31 @@ export function saveSent(sent) {
   } catch {
     // Worst case Dagen forgets what it sent and makes the events again.
   }
+}
+
+// When Dagen last asked Google what had changed. A plain timestamp, so
+// it gets its own tiny pair rather than the JSON helpers.
+export function loadSyncedAt() {
+  try {
+    return localStorage.getItem(SYNCED_AT_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function saveSyncedAt(moment) {
+  try {
+    localStorage.setItem(SYNCED_AT_KEY, moment)
+  } catch {
+    // Then Dagen asks for a longer stretch next time: slower, not wrong.
+  }
+}
+
+// Which calendars count as "busy" for the conflict check.
+export function loadBusyCalendars() {
+  return loadList(CALENDAR_IDS_KEY)
+}
+
+export function saveBusyCalendars(ids) {
+  saveList(CALENDAR_IDS_KEY, ids)
 }
