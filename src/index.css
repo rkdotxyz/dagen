@@ -4,6 +4,9 @@
   Colours live once as tokens (the --names) and are reused with var(--name).
   Dark mode only swaps the tokens. Category colours are NOT here: they come
   from config.js, because Google Calendar has to agree with them.
+
+  New in this phase: the add form, the duration chips, and the amber
+  --warn colour used for overlaps.
 */
 
 :root {
@@ -14,6 +17,7 @@
   --line: #e2e2de;
   --accent: #0b6e7f;
   --accent-text: #ffffff;
+  --warn: #b26a00; /* the amber of a conflict */
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
@@ -29,6 +33,7 @@
     --line: #2e2e2e;
     --accent: #5cc8db;
     --accent-text: #0d1f22;
+    --warn: #f0a85a;
   }
 }
 
@@ -140,26 +145,45 @@ h1 {
 
 /* ---------- Add form ---------- */
 
-.add-task {
+.task-form {
   display: flex;
+  flex-direction: column; /* stack the rows instead of lining them up */
   gap: 0.5rem;
+  padding: 0.8rem;
   margin-bottom: 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 
-.add-task input {
-  flex: 1;
+.task-form input[type='text'],
+.task-form input[type='date'],
+.task-form select {
   font: inherit;
-  padding: 0.6rem 0.8rem;
+  padding: 0.6rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--surface);
+  background: var(--bg);
   color: var(--text);
 }
 
-.add-task button {
+/* A row of controls that wraps onto the next line on a narrow phone. */
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-row input[type='date'] {
+  flex: 1;
+  min-width: 9rem;
+}
+
+.form-row button[type='submit'] {
   font: inherit;
   font-weight: 600;
-  padding: 0.6rem 1rem;
+  padding: 0.6rem 1.1rem;
   border: 0;
   border-radius: 10px;
   background: var(--accent);
@@ -167,11 +191,64 @@ h1 {
   cursor: pointer;
 }
 
-/* A quieter second button, for "Done". */
-.add-task .ghost {
+.task-form .ghost {
+  font: inherit;
+  padding: 0.6rem 0.8rem;
+  border: 0;
   background: none;
   color: var(--muted);
-  font-weight: 400;
+  cursor: pointer;
+}
+
+/* The tentative tickbox takes the spare space, pushing the two buttons
+   to the right end of the row. */
+.tentative-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* ---------- Duration chips ---------- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px; /* a huge radius makes a pill shape */
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* The chosen chip. [aria-pressed='true'] styles whichever one the
+   component marked as pressed: no extra class needed. */
+.chip[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.form-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ---------- Conflicts ---------- */
+
+.clash-note {
+  color: var(--warn);
+  font-size: 0.85rem;
 }
 
 /* ---------- Tasks ---------- */
@@ -196,9 +273,31 @@ h1 {
 .task-main {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* the tick lines up with the first line */
   gap: 0.75rem;
   cursor: pointer;
+}
+
+/* Title, time and any clash note, stacked. */
+.task-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.task-when {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* The tilde marking a time that may still move. */
+.tilde {
+  color: var(--muted);
+}
+
+/* A task that overlaps something: an amber edge down its left side. */
+.task.clash {
+  border-left: 3px solid var(--warn);
 }
 
 .task-main input {
