@@ -52,3 +52,35 @@
 - [x] 9 tests pass locally and in CI
 - [x] Saw the check go red, then green
 - [x] Tagged v0.3
+
+
+## Phase 3: Categories and colours (v0.4)
+
+**Date:** 2026-10-01
+
+**What I did**
+- Added src/config.js: eight categories, each with a name, a hex colour and Google Calendar's colour id
+- Home screen is now stacked collapsible sections, one per category, with a colour dot and a count of what's left
+- Each section has its own +, so adding a task never means picking a category
+- storage.js migrates tasks with no category, or an unknown one, to the default category
+- Collapsed sections are remembered under their own storage key
+- Rewrote App.test.jsx for the new behaviour; added config tests (unique ids, valid hex, Google colour ids 1-11)
+
+**Results**
+- 18 tests passing locally and in CI
+- Phase 1 tasks reappeared under Personal instead of disappearing
+
+**What broke and how I fixed it**
+- CI failed on the pull request: the old App.test.jsx was still in place, so six tests looked for 'Task name', the single add box that no longer exists. Fixed by pasting in the rewritten test file and pushing again.
+
+**Learned**
+- Grouping is a view, not a second copy: one list of tasks, each section gets tasks.filter(...)
+- Data you edit by hand deserves tests too; a typo in a colour now fails a check
+- When behaviour changes on purpose, its tests change with it. A red test can mean "update me", not only "fix the app"
+- within(...) in tests searches inside one section, which is how you prove a task landed in the right place
+
+**Checklist**
+- [x] Eight coloured sections, each with its own +
+- [x] Folding remembered after a reload
+- [x] Old tasks rescued into Personal
+- [x] Merged via PR, tagged v0.4
