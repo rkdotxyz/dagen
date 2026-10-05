@@ -60,7 +60,15 @@ function WeekStrip({
           ›
         </button>
 
-        <button type="button" className="today-button" onClick={onToday}>
+        {/* Its own name: the day button for today is also called "Today",
+            and two buttons with the same name confuse screen readers (and
+            tests) about which one you mean. */}
+        <button
+          type="button"
+          className="today-button"
+          onClick={onToday}
+          aria-label="Go to today"
+        >
           Today
         </button>
       </div>

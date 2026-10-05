@@ -5,8 +5,8 @@
   Dark mode only swaps the tokens. Category colours are NOT here: they come
   from config.js, because Google Calendar has to agree with them.
 
-  New in this phase: the week strip across the top, and the small buttons
-  at the right end of each task row.
+  New in this phase: the Repeats button in the header and the recurring
+  chores panel.
 */
 
 :root {
@@ -54,7 +54,62 @@ body {
 }
 
 .app-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   margin-bottom: 1.5rem;
+}
+
+/* Pushes the Repeats button to the right end of the header row. */
+.repeats-button {
+  margin-left: auto;
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.repeats-button[aria-expanded='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+/* ---------- Recurring chores ---------- */
+
+.templates {
+  padding: 0.9rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.templates h2 {
+  font-size: 1rem;
+  margin: 0 0 0.6rem;
+}
+
+.template-list {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+}
+
+.template {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+}
+
+.template-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 h1 {
