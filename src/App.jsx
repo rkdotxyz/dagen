@@ -8,12 +8,15 @@
 */
 
 import { useEffect, useState } from 'react'
+import AccountBar from './components/AccountBar.jsx'
 import CategorySection from './components/CategorySection.jsx'
 import TemplatePanel from './components/TemplatePanel.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
 import { CATEGORIES } from './config.js'
+import { loadPlanner, savePlanner } from './lib/cloud.js'
 import { conflictsById } from './lib/conflicts.js'
 import { missingTasks, skipKey } from './lib/recurring.js'
+import { isConfigured, supabase } from './lib/supabase.js'
 import {
   addDays,
   formatDay,
@@ -91,6 +94,9 @@ function App() {
   const [templates, setTemplates] = useState(() => loadTemplates())
   const [skipped, setSkipped] = useState(() => loadSkipped())
   const [showTemplates, setShowTemplates] = useState(false)
+  // Who's signed in, or null. Supabase calls this a session.
+  const [session, setSession] = useState(null)
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     saveTasks(tasks)
@@ -107,6 +113,77 @@ function App() {
   useEffect(() => {
     saveSkipped(skipped)
   }, [skipped])
+
+  // Ask Supabase who's signed in, then listen for changes: signing in,
+  // signing out, or a session restored when you reopen the app.
+  useEffect(() => {
+    if (!supabase) return
+
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+
+    const { data } = supabase.auth.onAuthStateChange((_event, next) =>
+      setSession(next),
+    )
+
+    // Returning a function from an effect is how you clean up. Without
+    // this, every redraw would add another listener.
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  // When someone signs in: take whatever is in the cloud. If they've
+  // never saved, push what's on this device up instead.
+  useEffect(() => {
+    if (!session) return
+
+    // Set to true if this effect is replaced before the answer arrives
+    // (a fast sign out, say), so a late reply can't overwrite newer state.
+    let cancelled = false
+
+    loadPlanner(supabase, session.user.id).then((planner) => {
+      if (cancelled) return
+
+      if (!planner) {
+        savePlanner(supabase, session.user.id, {
+          tasks: tasks,
+          templates: templates,
+          skipped: skipped,
+          collapsed: collapsed,
+        })
+        return
+      }
+
+      setTasks(planner.tasks)
+      setTemplates(planner.templates)
+      setSkipped(planner.skipped)
+      setCollapsed(planner.collapsed)
+    })
+
+    return () => {
+      cancelled = true
+    }
+    // Only when the session changes. The lists are read as they are at
+    // that moment, which is what we want: this is a one-off handover.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session])
+
+  // Save to the cloud whenever anything changes, but not on every
+  // keystroke: wait 800ms for things to settle. Each change cancels the
+  // previous timer, so a burst of edits becomes one write.
+  useEffect(() => {
+    if (!session) return
+
+    setSyncing(true)
+    const timer = setTimeout(() => {
+      savePlanner(supabase, session.user.id, {
+        tasks: tasks,
+        templates: templates,
+        skipped: skipped,
+        collapsed: collapsed,
+      }).then(() => setSyncing(false))
+    }, 800)
+
+    return () => clearTimeout(timer)
+  }, [session, tasks, templates, skipped, collapsed])
 
 
   function addTask(categoryId, details) {
@@ -188,6 +265,20 @@ function App() {
           Repeats
         </button>
       </header>
+
+      <AccountBar
+        isConfigured={isConfigured}
+        session={session}
+        syncing={syncing}
+        onSignIn={() =>
+          supabase.auth.signInWithOAuth({
+            provider: 'google',
+            // Come back to the page you're on, wherever it's running.
+            options: { redirectTo: window.location.origin },
+          })
+        }
+        onSignOut={() => supabase.auth.signOut()}
+      />
 
       {showTemplates && (
         <TemplatePanel

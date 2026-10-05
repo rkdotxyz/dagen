@@ -84,3 +84,28 @@
 - [x] Folding remembered after a reload
 - [x] Old tasks rescued into Personal
 - [x] Merged via PR, tagged v0.4
+
+
+## Phase 5: Week strip and task actions (v0.6)
+
+**Date:** 2026-10-05
+
+**What I did**
+- Monday-first week strip with arrows, a Today button, swipe, and dots for days with tasks or clashes
+- Sections now show one day at a time; new tasks default to the day being viewed
+- TaskForm does double duty: add, or edit an existing task with +15m / +1h / Tomorrow chips
+- shiftStart moves a task across midnight correctly
+
+**What broke and how I fixed it**
+- (fill in)
+
+**Learned**
+- (getDay() + 6) % 7 is the whole Monday-first convention
+- useRef holds a value between redraws without causing one, which is right for a swipe position
+- Accessible names carry meaning: the day buttons are named "Tomorrow, 2 tasks, has a clash", and the tests read the same name a screen reader would
+- Touch events travel upwards, so the swipe handlers belong on the whole strip
+
+**Checklist**
+- [x] Week strip, day filtering, editing
+- [x] 69 tests passing
+- [x] Merged via PR, tagged v0.6
