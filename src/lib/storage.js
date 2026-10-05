@@ -1,8 +1,12 @@
 /*
   storage.js — saves and loads what the app needs to remember.
 
-  Two things now: the tasks, and which category sections you collapsed.
-  They're kept under separate keys so one can't damage the other.
+  Four things now: the tasks, which category sections you collapsed, your
+  recurring chore templates, and the days you deleted a chore on. Each has
+  its own key, so one can't damage another.
+
+  Three of them are plain lists, so one pair of helpers at the bottom
+  serves all of them.
 
   In a later phase this file will talk to a cloud database instead, and
   nothing else in the app will need to change.
@@ -13,6 +17,8 @@ import { makeStart, todayISO } from './dates.js'
 
 const TASKS_KEY = 'dagen.tasks.v1'
 const COLLAPSED_KEY = 'dagen.collapsed.v1'
+const TEMPLATES_KEY = 'dagen.templates.v1'
+const SKIPPED_KEY = 'dagen.skipped.v1'
 
 // Old saves are brought up to date as they load. This is a "migration":
 // old data, new shape. Two of them now:
@@ -64,11 +70,14 @@ export function saveTasks(tasks) {
   }
 }
 
-// The collapsed sections are stored as a list of category ids,
-// e.g. ["chores", "social"].
-export function loadCollapsed() {
+// ---- plain lists ----
+//
+// Written once, used three times. Anything that goes wrong (nothing
+// saved, blocked storage, damaged text) comes back as an empty list, so
+// the app always starts.
+function loadList(key) {
   try {
-    const saved = localStorage.getItem(COLLAPSED_KEY)
+    const saved = localStorage.getItem(key)
     if (!saved) return []
 
     const parsed = JSON.parse(saved)
@@ -78,10 +87,38 @@ export function loadCollapsed() {
   }
 }
 
-export function saveCollapsed(categoryIds) {
+function saveList(key, list) {
   try {
-    localStorage.setItem(COLLAPSED_KEY, JSON.stringify(categoryIds))
+    localStorage.setItem(key, JSON.stringify(list))
   } catch {
-    // Same as above: forgetting which sections were folded is harmless.
+    // Storage full or switched off: harmless for all three of these.
   }
+}
+
+// The ids of the folded category sections, e.g. ["chores", "social"].
+export function loadCollapsed() {
+  return loadList(COLLAPSED_KEY)
+}
+
+export function saveCollapsed(categoryIds) {
+  saveList(COLLAPSED_KEY, categoryIds)
+}
+
+// The recurring chore rules, e.g. "Cook, daily, 18:00, 1h".
+export function loadTemplates() {
+  return loadList(TEMPLATES_KEY)
+}
+
+export function saveTemplates(templates) {
+  saveList(TEMPLATES_KEY, templates)
+}
+
+// "templateId:day" for every chore you deleted on a particular day, so
+// it isn't made again next time you open that day.
+export function loadSkipped() {
+  return loadList(SKIPPED_KEY)
+}
+
+export function saveSkipped(keys) {
+  saveList(SKIPPED_KEY, keys)
 }

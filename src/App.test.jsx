@@ -1,9 +1,13 @@
 /*
   App.test.jsx — tests for the app as a person would use it.
 
-  Sections now show only the day the week strip is on, so several tests
-  move between days first. The helpers at the top hide that plumbing, so
-  each test reads as the sentence it's checking.
+  Sections show only the day the week strip is on, so several tests move
+  between days first. The helpers at the top hide that plumbing, so each
+  test reads as the sentence it's checking.
+
+  The last group covers recurring chores, which is the trickiest thing in
+  the app: a rule that quietly makes tasks must not make them twice, and
+  must take no for an answer.
 */
 
 import {
@@ -15,7 +19,13 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import App from './App.jsx'
-import { addDays, formatDuration, todayISO } from './lib/dates.js'
+import {
+  addDays,
+  formatDay,
+  formatDuration,
+  todayISO,
+  weekDays,
+} from './lib/dates.js'
 
 beforeEach(() => {
   localStorage.clear()
@@ -126,7 +136,7 @@ test('the arrows move a week at a time, and Today comes back', () => {
   fireEvent.click(screen.getByLabelText('Next week'))
   expect(screen.queryByText('Laundry')).toBeNull()
 
-  fireEvent.click(screen.getByRole('button', { name: 'Today' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Go to today' }))
   expect(screen.getByText('Laundry')).toBeTruthy()
 })
 
@@ -340,4 +350,112 @@ test('a task saved without a time gets a tentative slot today', () => {
   expect(within(chores).getByText(/Today · 09:00–09:30/)).toBeTruthy()
   expect(within(chores).getByText('~')).toBeTruthy()
   expect(todayISO()).toBeTruthy()
+})
+
+// ---- recurring chores ----
+
+// Adds a chore rule through the Repeats panel, then closes it.
+function addChore({ title, category = 'Meals', repeat = 'daily', weekday, time }) {
+  fireEvent.click(screen.getByRole('button', { name: 'Repeats' }))
+
+  const panel = within(screen.getByRole('region', { name: 'Recurring chores' }))
+  fireEvent.change(panel.getByLabelText('Chore name'), { target: { value: title } })
+  fireEvent.change(panel.getByLabelText('Category'), { target: { value: category.toLowerCase() } })
+  fireEvent.change(panel.getByLabelText('How often'), { target: { value: repeat } })
+
+  if (weekday !== undefined) {
+    fireEvent.change(panel.getByLabelText('Weekday'), { target: { value: String(weekday) } })
+  }
+
+  fireEvent.change(panel.getByLabelText('Chore time'), { target: { value: time } })
+  fireEvent.click(panel.getByRole('button', { name: 'Add chore' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Repeats' }))
+}
+
+test('a daily chore appears today and on the days you visit', () => {
+  render(<App />)
+  addChore({ title: 'Cook dinner', time: '18:00' })
+
+  expect(within(section('Meals')).getByText('Cook dinner')).toBeTruthy()
+
+  fireEvent.click(dayButton(/^Tomorrow/))
+  expect(within(section('Meals')).getByText('Cook dinner')).toBeTruthy()
+})
+
+test('a weekly chore only appears on its weekday', () => {
+  render(<App />)
+  // weekdayIndex counts Monday as 0, so 6 is Sunday.
+  const sunday = weekDays(todayISO())[6]
+  addChore({ title: 'Laundry', category: 'Chores', repeat: 'weekly', weekday: 6, time: '14:00' })
+
+  const todayIsSunday = todayISO() === sunday
+  expect(Boolean(screen.queryByText('Laundry'))).toBe(todayIsSunday)
+
+  fireEvent.click(dayButton(new RegExp(`^${formatDay(sunday, new Date(`${todayISO()}T12:00`))}`)))
+  expect(within(section('Chores')).getByText('Laundry')).toBeTruthy()
+})
+
+test('a chore is not made twice on the same day', () => {
+  render(<App />)
+  addChore({ title: 'Cook dinner', time: '18:00' })
+
+  // Leave the day and come back: still one.
+  fireEvent.click(dayButton(/^Tomorrow/))
+  fireEvent.click(screen.getByRole('button', { name: 'Go to today' }))
+
+  expect(within(section('Meals')).getAllByText('Cook dinner')).toHaveLength(1)
+})
+
+test("deleting a chore clears it for that day only", () => {
+  render(<App />)
+  addChore({ title: 'Cook dinner', time: '18:00' })
+
+  fireEvent.click(screen.getByLabelText('Delete Cook dinner'))
+  expect(screen.queryByText('Cook dinner')).toBeNull()
+
+  // It stays gone when you come back to today...
+  fireEvent.click(dayButton(/^Tomorrow/))
+  expect(within(section('Meals')).getByText('Cook dinner')).toBeTruthy()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Go to today' }))
+  expect(screen.queryByText('Cook dinner')).toBeNull()
+})
+
+test("a chore you moved isn't made again", () => {
+  render(<App />)
+  addChore({ title: 'Cook dinner', time: '18:00' })
+
+  fireEvent.click(screen.getByLabelText('Edit Cook dinner'))
+  fireEvent.click(within(section('Meals')).getByRole('button', { name: '+1h' }))
+  fireEvent.click(within(section('Meals')).getByRole('button', { name: 'Save' }))
+
+  fireEvent.click(dayButton(/^Tomorrow/))
+  fireEvent.click(screen.getByRole('button', { name: 'Go to today' }))
+
+  expect(within(section('Meals')).getAllByText('Cook dinner')).toHaveLength(1)
+  expect(within(section('Meals')).getByText(/19:00–19:30/)).toBeTruthy()
+})
+
+test('deleting the rule stops new copies but keeps the ones already there', () => {
+  render(<App />)
+  addChore({ title: 'Cook dinner', time: '18:00' })
+
+  fireEvent.click(screen.getByRole('button', { name: 'Repeats' }))
+  fireEvent.click(screen.getByLabelText('Delete the Cook dinner chore'))
+  fireEvent.click(screen.getByRole('button', { name: 'Repeats' }))
+
+  expect(within(section('Meals')).getByText('Cook dinner')).toBeTruthy()
+
+  fireEvent.click(dayButton(/^Tomorrow/))
+  expect(screen.queryByText('Cook dinner')).toBeNull()
+})
+
+test('chores survive a reload, without doubling up', () => {
+  render(<App />)
+  addChore({ title: 'Cook dinner', time: '18:00' })
+
+  cleanup()
+  render(<App />)
+
+  expect(within(section('Meals')).getAllByText('Cook dinner')).toHaveLength(1)
 })

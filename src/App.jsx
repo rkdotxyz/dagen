@@ -9,9 +9,11 @@
 
 import { useEffect, useState } from 'react'
 import CategorySection from './components/CategorySection.jsx'
+import TemplatePanel from './components/TemplatePanel.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
 import { CATEGORIES } from './config.js'
 import { conflictsById } from './lib/conflicts.js'
+import { missingTasks, skipKey } from './lib/recurring.js'
 import {
   addDays,
   formatDay,
@@ -21,10 +23,29 @@ import {
   todayISO,
   weekDays,
 } from './lib/dates.js'
-import { loadCollapsed, loadTasks, saveCollapsed, saveTasks } from './lib/storage.js'
+import {
+  loadCollapsed,
+  loadSkipped,
+  loadTasks,
+  loadTemplates,
+  saveCollapsed,
+  saveSkipped,
+  saveTasks,
+  saveTemplates,
+} from './lib/storage.js'
 
 function makeId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+}
+
+// Adds any recurring chores that this day should have and doesn't yet.
+// Returns the list unchanged when there's nothing to add, so React has
+// no reason to redraw.
+function fillChores(tasks, day, templates, skipped) {
+  const extra = missingTasks(templates, day, tasks, skipped)
+  if (extra.length === 0) return tasks
+
+  return [...tasks, ...extra.map((task) => ({ id: makeId(), ...task }))]
 }
 
 function byTime(a, b) {
@@ -55,12 +76,21 @@ function dayMarkers(tasks, conflicts) {
 }
 
 function App() {
-  const [tasks, setTasks] = useState(() => loadTasks())
+  // Today's chores are filled in as the app starts, before anything is
+  // drawn. Doing it here rather than in an effect means no extra redraw,
+  // and no risk of a loop.
+  const [tasks, setTasks] = useState(() =>
+    fillChores(loadTasks(), todayISO(), loadTemplates(), loadSkipped()),
+  )
   const [collapsed, setCollapsed] = useState(() => loadCollapsed())
   // The day the strip is on. Dagen always opens on today: this is state,
   // not something saved, so closing and reopening comes back to today.
   const [selectedDay, setSelectedDay] = useState(() => todayISO())
   const [today] = useState(() => todayISO())
+  // The recurring chore rules, and the "don't bring this one back" list.
+  const [templates, setTemplates] = useState(() => loadTemplates())
+  const [skipped, setSkipped] = useState(() => loadSkipped())
+  const [showTemplates, setShowTemplates] = useState(false)
 
   useEffect(() => {
     saveTasks(tasks)
@@ -69,6 +99,15 @@ function App() {
   useEffect(() => {
     saveCollapsed(collapsed)
   }, [collapsed])
+
+  useEffect(() => {
+    saveTemplates(templates)
+  }, [templates])
+
+  useEffect(() => {
+    saveSkipped(skipped)
+  }, [skipped])
+
 
   function addTask(categoryId, details) {
     setTasks([...tasks, { id: makeId(), categoryId: categoryId, status: 'todo', ...details }])
@@ -86,7 +125,35 @@ function App() {
   }
 
   function deleteTask(id) {
-    setTasks(tasks.filter((task) => task.id !== id))
+    const task = tasks.find((item) => item.id === id)
+
+    // Deleting a chore means "not this time", not "stop the rule". Note
+    // the day so it isn't made again the next time you open that day.
+    if (task?.templateId) {
+      setSkipped([...skipped, skipKey(task.templateId, splitStart(task.start).day)])
+    }
+
+    setTasks(tasks.filter((item) => item.id !== id))
+  }
+
+  // Moving to another day is the moment its chores are filled in. The
+  // three ways of moving (tapping a day, the arrows, Today) all come here.
+  function goToDay(day) {
+    setSelectedDay(day)
+    setTasks((current) => fillChores(current, day, templates, skipped))
+  }
+
+  function addTemplate(details) {
+    const template = { id: makeId(), ...details }
+    setTemplates([...templates, template])
+    // So a new chore shows up straight away, not only tomorrow.
+    setTasks((current) => fillChores(current, selectedDay, [...templates, template], skipped))
+  }
+
+  // Deleting a rule stops future copies. The ones already on your days
+  // stay: they're ordinary tasks now, and some may be done already.
+  function deleteTemplate(id) {
+    setTemplates(templates.filter((template) => template.id !== id))
   }
 
   function toggleCollapse(categoryId) {
@@ -111,7 +178,24 @@ function App() {
       <header className="app-header">
         <h1>Dagen</h1>
         <p className="today">{formatDay(selectedDay, new Date(`${today}T12:00`))}</p>
+
+        <button
+          type="button"
+          className="repeats-button"
+          onClick={() => setShowTemplates(!showTemplates)}
+          aria-expanded={showTemplates}
+        >
+          Repeats
+        </button>
       </header>
+
+      {showTemplates && (
+        <TemplatePanel
+          templates={templates}
+          onAdd={addTemplate}
+          onDelete={deleteTemplate}
+        />
+      )}
 
       <WeekStrip
         days={days}
@@ -119,10 +203,10 @@ function App() {
         today={today}
         markers={markers}
         monthLabel={formatMonthLabel(days)}
-        onSelect={setSelectedDay}
+        onSelect={goToDay}
         // Moving a week keeps the same weekday: Wednesday to Wednesday.
-        onShiftWeek={(amount) => setSelectedDay(addDays(selectedDay, amount * 7))}
-        onToday={() => setSelectedDay(today)}
+        onShiftWeek={(amount) => goToDay(addDays(selectedDay, amount * 7))}
+        onToday={() => goToDay(today)}
       />
 
       {CATEGORIES.map((category) => (
