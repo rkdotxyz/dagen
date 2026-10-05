@@ -1,12 +1,13 @@
 /*
-  CategorySection.jsx — one category: its coloured header, its tasks in
-  time order, and its own add panel.
+  CategorySection.jsx — one category: its header, its tasks in time order,
+  and its own add panel.
 
-  It owns one small thing: whether its add panel is open. Everything that
-  outlives a redraw is owned by App.
+  It owns two small things: whether the add panel is open, and which task
+  is being edited. Everything that outlives a redraw is owned by App.
 */
 
 import { useState } from 'react'
+import { DrawablyBadge, DrawablyButton, DrawablyDivider } from 'drawably/react'
 import TaskForm from './TaskForm.jsx'
 import TaskItem from './TaskItem.jsx'
 
@@ -24,7 +25,6 @@ function CategorySection({
   onDeleteTask,
 }) {
   const [isAdding, setIsAdding] = useState(false)
-  // Which task is open for editing, or null. Only one at a time.
   const [editingId, setEditingId] = useState(null)
 
   const remaining = tasks.filter((task) => task.status !== 'done').length
@@ -43,30 +43,31 @@ function CategorySection({
           onClick={() => onToggleCollapse(category.id)}
           aria-expanded={!isCollapsed}
         >
+          {/* The one place Google's category colour still appears: a solid
+              swatch with a white ring, so even the darker Google colours
+              stay visible on blue paper. */}
           <span className="dot" style={{ backgroundColor: category.hex }} />
           <span className="category-name">{category.name}</span>
-          <span className="category-count">{remaining}</span>
+          <DrawablyBadge className="category-count">{remaining}</DrawablyBadge>
         </button>
 
-        <button
-          type="button"
+        <DrawablyButton
           className="add-button"
           onClick={startAdding}
           aria-label={`Add to ${category.name}`}
         >
           +
-        </button>
+        </DrawablyButton>
       </div>
+
+      <DrawablyDivider className="category-rule" />
 
       {!isCollapsed && (
         <>
           {isAdding && (
             <TaskForm
               categoryName={category.name}
-              // The form checks against EVERY task, not just this
-              // category's: a clash doesn't care which section it's in.
               tasks={allTasks}
-              // New tasks land on the day the week strip is showing.
               defaultDay={selectedDay}
               onSubmit={(details) => onAdd(category.id, details)}
               onCancel={() => setIsAdding(false)}
@@ -78,7 +79,6 @@ function CategorySection({
           ) : (
             <ul className="task-list">
               {tasks.map((task) =>
-                // The row being edited is replaced by the form, in place.
                 task.id === editingId ? (
                   <li key={task.id}>
                     <TaskForm
@@ -96,8 +96,6 @@ function CategorySection({
                   <TaskItem
                     key={task.id}
                     task={task}
-                    // ?? [] means "if there's no entry for this id, use an
-                    // empty list", so TaskItem never has to check for null.
                     conflicts={conflicts[task.id] ?? []}
                     onToggle={onToggleTask}
                     onEdit={setEditingId}

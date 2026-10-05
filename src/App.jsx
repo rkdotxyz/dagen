@@ -8,6 +8,7 @@
 */
 
 import { useEffect, useRef, useState } from 'react'
+import { DrawablyButton } from 'drawably/react'
 import AccountBar from './components/AccountBar.jsx'
 import CalendarBar from './components/CalendarBar.jsx'
 import CalendarPicker from './components/CalendarPicker.jsx'
@@ -176,9 +177,7 @@ function App() {
 
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
 
-    const { data } = supabase.auth.onAuthStateChange((_event, next) =>
-      setSession(next),
-    )
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next))
 
     // Returning a function from an effect is how you clean up. Without
     // this, every redraw would add another listener.
@@ -239,7 +238,6 @@ function App() {
 
     return () => clearTimeout(timer)
   }, [session, tasks, templates, skipped, collapsed])
-
 
   // The permission to touch your calendar, handed over by Google when you
   // connect. It lives on the session, and lasts about an hour.
@@ -368,7 +366,10 @@ function App() {
   }, [calendarToken, busyCalendars, selectedDay])
 
   function addTask(categoryId, details) {
-    setTasks([...tasks, { id: makeId(), categoryId: categoryId, status: 'todo', ...details }])
+    setTasks([
+      ...tasks,
+      { id: makeId(), categoryId: categoryId, status: 'todo', ...details },
+    ])
   }
 
   // Changes some fields of one task and leaves the rest alone.
@@ -405,7 +406,9 @@ function App() {
     const template = { id: makeId(), ...details }
     setTemplates([...templates, template])
     // So a new chore shows up straight away, not only tomorrow.
-    setTasks((current) => fillChores(current, selectedDay, [...templates, template], skipped))
+    setTasks((current) =>
+      fillChores(current, selectedDay, [...templates, template], skipped),
+    )
   }
 
   // Deleting a rule stops future copies. The ones already on your days
@@ -439,14 +442,15 @@ function App() {
         <h1>Dagen</h1>
         <p className="today">{formatDay(selectedDay, new Date(`${today}T12:00`))}</p>
 
-        <button
-          type="button"
+        {/* Drawn solid while its panel is open, outline when closed. */}
+        <DrawablyButton
           className="repeats-button"
+          variant={showTemplates ? 'solid' : 'outline'}
           onClick={() => setShowTemplates(!showTemplates)}
           aria-expanded={showTemplates}
         >
           Repeats
-        </button>
+        </DrawablyButton>
       </header>
 
       <AccountBar

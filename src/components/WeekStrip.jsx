@@ -1,13 +1,13 @@
 /*
-  WeekStrip.jsx — the row of seven days at the top, like the one in the
-  Google Calendar app.
+  WeekStrip.jsx — the row of seven days at the top.
 
-  It holds no state of its own: it's told which week to draw and which day
-  is selected, and it reports taps upwards. A component like this is easy
-  to reason about, because the same props always draw the same thing.
+  It holds no state about the week: it draws what it's told and reports
+  taps upwards. Since Phase 10 the selected day gets a pen loop around its
+  number and today gets an underline, instead of a coloured block.
 */
 
 import { useRef } from 'react'
+import { DrawablyButton, DrawablyCircle, DrawablyUnderline } from 'drawably/react'
 import { dayNumber, formatDay, weekdayLetter } from '../lib/dates.js'
 
 function WeekStrip({
@@ -20,13 +20,6 @@ function WeekStrip({
   onShiftWeek,
   onToday,
 }) {
-  // Swipe: remember where a finger went down, and when it lifts, see how
-  // far it travelled sideways. More than 50 pixels counts as a swipe;
-  // less is a tap or a wobble.
-  //
-  // useRef is a box React keeps between redraws. A plain variable would be
-  // reset every redraw; state would redraw the screen on every touch, which
-  // is pointless here because nothing on screen depends on it yet.
   const touchStartX = useRef(0)
 
   function handleTouchStart(event) {
@@ -36,13 +29,10 @@ function WeekStrip({
   function handleTouchEnd(event) {
     const distance = event.changedTouches[0].clientX - touchStartX.current
     if (Math.abs(distance) < 50) return
-    // Dragging left (a negative distance) moves forward in time.
     onShiftWeek(distance < 0 ? 1 : -1)
   }
 
   return (
-    // The swipe handlers sit on the whole strip, so a swipe anywhere
-    // across it counts, not only on the row of numbers.
     <nav
       className="week-strip"
       aria-label="Week"
@@ -50,37 +40,32 @@ function WeekStrip({
       onTouchEnd={handleTouchEnd}
     >
       <div className="week-head">
-        <button type="button" onClick={() => onShiftWeek(-1)} aria-label="Previous week">
-          ‹
-        </button>
+        {/* "prev" and "next" in words: the pen font has no arrow glyphs. */}
+        <DrawablyButton onClick={() => onShiftWeek(-1)} aria-label="Previous week">
+          prev
+        </DrawablyButton>
 
         <span className="month-label">{monthLabel}</span>
 
-        <button type="button" onClick={() => onShiftWeek(1)} aria-label="Next week">
-          ›
-        </button>
+        <DrawablyButton onClick={() => onShiftWeek(1)} aria-label="Next week">
+          next
+        </DrawablyButton>
 
-        {/* Its own name: the day button for today is also called "Today",
-            and two buttons with the same name confuse screen readers (and
-            tests) about which one you mean. */}
-        <button
-          type="button"
+        <DrawablyButton
           className="today-button"
           onClick={onToday}
           aria-label="Go to today"
         >
           Today
-        </button>
+        </DrawablyButton>
       </div>
 
       <div className="week-days">
         {days.map((day) => {
-          // ?? {} so a day with nothing on it still has something to read.
           const marker = markers[day] ?? {}
           const isSelected = day === selectedDay
+          const isToday = day === today
 
-          // The accessible name: what a screen reader announces, and what
-          // the tests search for. It says everything the dots say visually.
           const label = [
             formatDay(day, new Date(`${today}T12:00`)),
             marker.count ? `${marker.count} tasks` : null,
@@ -89,25 +74,27 @@ function WeekStrip({
             .filter(Boolean)
             .join(', ')
 
+          // The number, decorated: a loop for the selected day, a line
+          // under today, plain otherwise. A decoration is mounted fresh
+          // each time, so moving between days draws a new loop each time.
+          let number = dayNumber(day)
+          if (isSelected) number = <DrawablyCircle>{number}</DrawablyCircle>
+          else if (isToday) number = <DrawablyUnderline>{number}</DrawablyUnderline>
+
           return (
             <button
               key={day}
               type="button"
               className={isSelected ? 'day selected' : 'day'}
-              // aria-current="date" marks today even when another day is
-              // selected; aria-pressed marks the selected one.
-              aria-current={day === today ? 'date' : undefined}
+              aria-current={isToday ? 'date' : undefined}
               aria-pressed={isSelected}
               aria-label={label}
               onClick={() => onSelect(day)}
             >
               <span className="day-letter">{weekdayLetter(day)}</span>
-              <span className="day-number">{dayNumber(day)}</span>
-
-              {/* aria-hidden: the dots repeat what the label already says,
-                  so screen readers should skip them. */}
+              <span className="day-number">{number}</span>
               <span className="day-marks" aria-hidden="true">
-                {marker.hasConflict ? '!' : marker.count ? '·' : ''}
+                {marker.hasConflict ? '!' : marker.count ? '.' : ''}
               </span>
             </button>
           )
