@@ -13,6 +13,8 @@ import {
   loadTasks,
   loadTemplates,
   saveCollapsed,
+  loadSent,
+  saveSent,
   saveSkipped,
   saveTasks,
   saveTemplates,
@@ -153,6 +155,18 @@ describe('templates and skipped chores', () => {
 
     expect(loadTemplates()).toEqual([cook])
     expect(loadSkipped()).toEqual(['cook:2026-10-05'])
+  })
+
+  test('the calendar record starts empty and loads back', () => {
+    expect(loadSent()).toEqual({})
+
+    saveSent({ t1: { eventId: 'event-1', signature: 'Laundry|...' } })
+    expect(loadSent().t1.eventId).toBe('event-1')
+  })
+
+  test('a damaged calendar record becomes an empty one', () => {
+    localStorage.setItem('dagen.calendar.v1', '["not", "an", "object"]')
+    expect(loadSent()).toEqual({})
   })
 
   test('are kept apart from each other', () => {
