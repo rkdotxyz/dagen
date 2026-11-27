@@ -308,3 +308,39 @@
 - [x] No NaN anywhere, even empty
 - [x] `npm run check` passes: 358 tests
 - [ ] Merged via PR, tagged v2.6
+
+
+## Phase 17: Polish and release (v3.0)
+
+**Date:** 2026-11-28
+
+**What I did**
+- Undo after every delete: tasks (a deleted chore's "skip this day" is undone too), chore rules, Areas (deleted or archived), time entries, away time and dropped tasks. One `putBack` helper puts things back where they were
+- Data: Copy as JSON (falls back to a text box when the browser blocks the clipboard) and Import JSON, which checks the text first and replaces everything with an Undo. Import goes through the same safe defaults as a cloud row
+- One global "+ Add" form, and the N key on a computer (ignored while typing in a field)
+- A welcome card for a brand-new planner: "Start by adding your Areas"
+- The 360px pass: on touch screens every button and field is at least 44px (Tailwind's `pointer-coarse:`), and checkboxes and switches get an invisible 44px hit area. The Week view's Start button moved under the title, and the header buttons wrap together
+- Reduced motion: transitions and animations are switched off when the system asks (in since the shadcn/ui swap)
+- A dev-only sample planner at `?seed=horizon` (`src/lib/devSeed.js`), left out of the production build, and used for the README screenshots
+- The install description is now "Plan the day, the week and the quarter.", and the version is 3.0.0
+- README: features, screenshots and the roadmap, all ticked
+
+**What broke and how I fixed it**
+- (fill in)
+- The screenshots showed Week titles breaking mid-word ("DM 260 1 stu dio") at 1280px, once the Start button and the tick took their share of a narrow column. Start moved to its own line, and words now only break when one can't fit at all
+- On a phone, "Repeats" wrapped onto a line by itself. The three header buttons are now one group that wraps together
+
+**Learned**
+- (fill in)
+
+**v3.0 acceptance checklist (from the spec)**
+- [x] Old local and cloud data load with nothing lost
+- [x] A task can exist with no day, appear in To place, and never reach Google Calendar
+- [x] Unfinished flexible tasks roll over (after the morning question) with a visible "pushed N×"; fixed, done and recurring ones never do
+- [x] Every deadline task shows start now / start by / overdue correctly
+- [x] Week and Month flag overpacked days, counting busy Google events
+- [x] One timer at a time; it survives reloads and syncs through the cloud
+- [x] Insights numbers match hand-calculated fixtures
+- [x] Every view works at 360px, with no page-level sideways scroll
+- [x] `npm run check` passes and CI is green
+- [ ] README and build log updated (done here), and `v3.0` tagged after this is merged

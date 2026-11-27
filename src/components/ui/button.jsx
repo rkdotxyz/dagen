@@ -7,6 +7,10 @@
 
   Dagen sets type="button" by default: a plain <button> inside a form
   submits it, which is almost never what a chip or an arrow should do.
+
+  Dagen also adds "pointer-coarse:" sizes: on a touch screen every button
+  is at least 44px tall, a comfortable target for a finger. With a mouse
+  they keep shadcn's tighter sizes.
 */
 
 import { Slot } from '@radix-ui/react-slot'
@@ -28,10 +32,10 @@ const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-9 px-4 py-2 has-[>svg]:px-3',
-        sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
-        lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
-        icon: 'size-9',
+        default: 'h-9 px-4 py-2 has-[>svg]:px-3 pointer-coarse:h-11',
+        sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5 pointer-coarse:h-11',
+        lg: 'h-10 rounded-md px-6 has-[>svg]:px-4 pointer-coarse:h-11',
+        icon: 'size-9 pointer-coarse:size-11',
       },
     },
     defaultVariants: {

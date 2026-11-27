@@ -17,6 +17,9 @@
   Since Phase 15 an Area can have start and end days (they draw its bar
   on the Quarter timeline), and the panel lists your away blocks: trips
   and holidays, when a day has no capacity at all.
+
+  Since Phase 17 it ends with Data: copy the whole planner as JSON, or
+  import one (see DataSection.jsx).
 */
 
 import { useState } from 'react'
@@ -27,6 +30,7 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Switch } from '@/components/ui/switch'
 import { CATEGORIES, getCategory } from '../config.js'
+import DataSection from './DataSection.jsx'
 import { awayProblem, describeAway, sortedAway } from '../lib/away.js'
 import {
   AREA_STATUSES,
@@ -435,6 +439,8 @@ function AreasPanel({
   onAddAway,
   onChangeAway,
   onDeleteAway,
+  getExport,
+  onImport,
 }) {
   const live = areas.filter((area) => !area.archived)
   const archived = areas.filter((area) => area.archived)
@@ -572,6 +578,8 @@ function AreasPanel({
           onChange={onChangeAway}
           onDelete={onDeleteAway}
         />
+
+        <DataSection getExport={getExport} onImport={onImport} />
         </CardContent>
       </Card>
     </section>

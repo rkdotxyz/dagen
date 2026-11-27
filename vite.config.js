@@ -36,7 +36,7 @@ export default defineConfig({
       manifest: {
         name: 'Dagen',
         short_name: 'Dagen',
-        description: 'Plan the day in a few taps.',
+        description: 'Plan the day, the week and the quarter.',
         start_url: '/',
         // standalone = opens without the browser's address bar, like an app.
         display: 'standalone',

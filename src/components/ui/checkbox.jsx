@@ -3,6 +3,9 @@
 
   It's a <button role="checkbox"> rather than an <input>, so it reports
   changes through onCheckedChange(true/false), not onChange(event).
+
+  The box is 16px, too small for a finger, so an invisible ::after
+  reaches 14px further on every side: a 44px target, same look.
 */
 
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox'
@@ -14,7 +17,7 @@ function Checkbox({ className, ...props }) {
     <CheckboxPrimitive.Root
       data-slot="checkbox"
       className={cn(
-        'peer border-input dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
+        "relative after:absolute after:-inset-3.5 after:content-[''] peer border-input dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
