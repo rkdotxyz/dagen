@@ -1501,5 +1501,210 @@
   .muted-text {
     color: var(--muted-foreground);
   }
+
+  /* ---------- Phase 16: the Insights screen ---------- */
+
+  .stat-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (min-width: 900px) {
+    .stat-tiles {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+  }
+
+  /* The headline number of a tile. Long Area names wrap rather than
+     push the tile wider. */
+  .stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-detail {
+    font-size: 0.8rem;
+    color: var(--muted-foreground);
+  }
+
+  .insights-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  @media (min-width: 900px) {
+    .insights-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      align-items: start;
+    }
+  }
+
+  /* One bar, split by category. The 2px gaps and the thin outline keep
+     light colours (Meals' yellow) visible against the card. */
+  .split-bar {
+    display: flex;
+    gap: 2px;
+    height: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .split-segment {
+    min-width: 4px;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 18%, transparent);
+  }
+
+  .legend,
+  .top-labels {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.875rem;
+  }
+
+  .legend li,
+  .top-labels li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .legend-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .legend-value {
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .top-labels {
+    counter-reset: rank;
+  }
+
+  .top-labels li::before {
+    counter-increment: rank;
+    content: counter(rank);
+    width: 1.25rem;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Planned vs actual: the budget as an outline, tracked time filled in. */
+  .area-bars {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .area-bar-row {
+    display: grid;
+    grid-template-columns: minmax(0, 7rem) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .area-bar-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .area-bar-track {
+    position: relative;
+    height: 0.85rem;
+  }
+
+  .area-bar-plan,
+  .area-bar-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: 4px;
+  }
+
+  .area-bar-plan {
+    border: 1.5px solid var(--muted-foreground);
+  }
+
+  .area-bar-fill {
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    max-width: calc(100% - 3px);
+    background: var(--primary);
+  }
+
+  .area-bar-value {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Fourteen small bars, one per day. */
+  .switch-bars {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    gap: 2px;
+    height: 6rem;
+  }
+
+  .switch-day {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .switch-bar {
+    width: 100%;
+    max-width: 1.5rem;
+    min-height: 2px;
+    border-radius: 4px 4px 0 0;
+    background: var(--muted-foreground);
+  }
+
+  .switch-day.busy .switch-bar {
+    background: var(--warn);
+  }
+
+  .switch-count {
+    font-size: 0.65rem;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .switch-letter {
+    font-size: 0.65rem;
+    color: var(--muted-foreground);
+  }
 }
 

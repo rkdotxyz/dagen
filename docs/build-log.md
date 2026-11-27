@@ -284,3 +284,27 @@
 - [x] Away days have no capacity in Day, Week, Month and Quarter
 - [x] `npm run check` passes: 336 tests
 - [ ] Merged via PR, tagged v2.5
+
+
+## Phase 16: Insights (v2.6)
+
+**Date:** 2026-11-28
+
+**What I did**
+- `insights.js`: tracked time (entries plus the running timer up to now) and planned time (tasks on days up to today) by category and by Area. Also budget against actual scaled to the period, most behind, untouched longest, paused but still used, estimates against reality, Areas touched per day, the top labels, the balance score, and the headline
+- Every metric returns null or an empty list with no data, so the screen shows "—" and a hint, never NaN
+- The Insights tab, the last one to arrive: a Week / Month / Quarter switch, a headline that states the finding, four stat tiles, one bar split by category with a legend of hours and percentages, planned against actual per Area (an outline for the budget, a fill for tracked, amber under 50%), 14 small bars of Areas per day (amber at 6 or more), and where the hours went
+- Ran the chart colour checker on the category colours. Two fail (Meals' yellow is too light, Classes is grey) and several are low-contrast, but they're Google Calendar's and can't change. So every slice is named in words with its numbers, slices have a 2px gap and a thin outline, and hovering shows the exact figures
+
+**What broke and how I fixed it**
+- (fill in)
+- Two of my hand-worked test answers were wrong (who had been untouched longest; which category came first). The code was right; the expectations were fixed
+
+**Learned**
+- (fill in)
+
+**Checklist**
+- [x] Every metric tested with fixed fixtures, including no data
+- [x] No NaN anywhere, even empty
+- [x] `npm run check` passes: 358 tests
+- [ ] Merged via PR, tagged v2.6

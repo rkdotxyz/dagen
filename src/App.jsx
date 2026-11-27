@@ -20,6 +20,9 @@
   budgets. Its sums include weekly chores and lectures as previews
   (recurring.js), so a month of copies is never saved or sent to Google.
 
+  Since Phase 16 the Insights screen compares what you planned with what
+  you tracked (insights.js), for this week, month or quarter.
+
   Since Phase 15 there's a Quarter screen (triage, a timeline, outcomes),
   and away blocks can be added in the Areas panel.
 
@@ -45,6 +48,7 @@ import NowBar from './components/NowBar.jsx'
 import TimeLog from './components/TimeLog.jsx'
 import Toast from './components/Toast.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
+import InsightsView from './components/InsightsView.jsx'
 import MonthView from './components/MonthView.jsx'
 import QuarterView from './components/QuarterView.jsx'
 import WeekView from './components/WeekView.jsx'
@@ -228,6 +232,8 @@ function App() {
   const [monthDay, setMonthDay] = useState(() => todayISO())
   // And the Quarter screen's: its three months start from this day's month.
   const [quarterDay, setQuarterDay] = useState(() => todayISO())
+  // Which period the Insights screen looks at: week, month or quarter.
+  const [insightsPeriod, setInsightsPeriod] = useState('week')
   // The day the rollover question was last answered.
   const [rolloverAsked, setRolloverAsked] = useState(() => loadRolloverAsked())
   // The message at the bottom: { message, actionLabel?, onAction? } or null.
@@ -1134,6 +1140,18 @@ function App() {
           onShiftQuarter={(amount) => setQuarterDay(shiftMonth(quarterDay, amount * 3))}
           onThisQuarter={() => setQuarterDay(today)}
           onChangeArea={changeArea}
+        />
+      )}
+
+      {tab === 'insights' && (
+        <InsightsView
+          period={insightsPeriod}
+          today={today}
+          tasks={tasks}
+          areas={areas}
+          entries={entries}
+          activeTimer={activeTimer}
+          onChangePeriod={setInsightsPeriod}
         />
       )}
 
