@@ -112,3 +112,44 @@ describe('applyIncoming', () => {
     expect(applyIncoming([allDay], [laundry], sent, signatureOf).applied).toBe(0)
   })
 })
+
+// Phase 11: tasks can lose their start (unplaced, or any time on a day).
+describe('applyIncoming with tasks that have no start', () => {
+  const unplaced = { ...laundry, start: null, day: null }
+
+  test('ignores a change to the event of a task that is now unplaced', () => {
+    const moved = event({
+      start: { dateTime: '2026-10-05T16:00:00+02:00' },
+      end: { dateTime: '2026-10-05T16:30:00+02:00' },
+    })
+    const result = applyIncoming([moved], [unplaced], sent, signatureOf)
+
+    expect(result.applied).toBe(0)
+    expect(result.tasks[0]).toBe(unplaced)
+  })
+
+  test('the "cancelled" from removing its event does not delete the task', () => {
+    const result = applyIncoming([event({ status: 'cancelled' })], [unplaced], {}, signatureOf)
+    expect(result.tasks).toEqual([unplaced])
+  })
+
+  test('an old cancelled event does not delete a task that was placed again', () => {
+    // Unplaced (event-1 deleted), then placed again: now it has event-2.
+    const again = { t1: { eventId: 'event-2', signature: signatureOf(laundry) } }
+    const result = applyIncoming([event({ status: 'cancelled' })], [laundry], again, signatureOf)
+
+    expect(result.tasks).toEqual([laundry])
+    expect(result.applied).toBe(0)
+  })
+
+  test('moving an event to another day moves the task\'s day too', () => {
+    const nextDay = event({
+      start: { dateTime: '2026-10-06T14:00:00+02:00' },
+      end: { dateTime: '2026-10-06T15:30:00+02:00' },
+    })
+    const task = { ...laundry, day: '2026-10-05' }
+    const result = applyIncoming([nextDay], [task], sent, signatureOf)
+
+    expect(result.tasks[0]).toMatchObject({ start: '2026-10-06T14:00', day: '2026-10-06' })
+  })
+})

@@ -109,3 +109,37 @@
 - [x] Week strip, day filtering, editing
 - [x] 69 tests passing
 - [x] Merged via PR, tagged v0.6
+
+
+## Phase 11: Data model, Areas, unplaced tasks (v2.1)
+
+**Date:** 2026-11-27
+
+**What I did**
+- Saved the Horizon spec as `docs/horizon-spec.md`, with my answers to its open questions (keep the 8 categories, rollover as a morning prompt, every busy calendar counts as fixed time)
+- Tasks gained `day`, `areaId`, `fixed`, `due`, `priority`, `rolled` and `doneAt`. A task can now be timed, "any time" on a day, or unplaced (no day yet)
+- New `placement.js` (`placementOf`, `dayOf`, `timeOf`, `withDay`). Every place that called `splitStart(task.start)` on a task now goes through it, because `start` can be null
+- New `migrate.js`, shared by `storage.js` and `cloud.js`: old local saves and old cloud rows load with every field kept and the new ones defaulted. Cloud tasks are migrated too now (they weren't before)
+- Areas, time entries, the running timer, away blocks and settings are saved locally and in the cloud row. Only Areas and settings have screens so far
+- An Areas panel (header button): add, edit, delete, restore, last worked on, the active-Area limit warning, and the settings (free hours, active limit, rollover)
+- Deleting an Area that tasks still use asks first, then archives it. Its name stays on old tasks, greyed out
+- The task form has an Area picker (grouped by category; picking one sets the category), "Any time" in the time list, and a "No day yet" chip
+- A simple "To place" list under the categories for tasks with no day
+- Google Calendar: only timed tasks are sent. Unplacing a task deletes its event. Incoming changes for unplaced tasks are ignored, and an old event's "cancelled" can't delete a task that was placed again
+- Ticking a task notes when (`doneAt`)
+- README roadmap fixed (it still said Phase 4) and Phases 11–17 added
+
+**What broke and how I fixed it**
+- (fill in)
+- Five storage and cloud tests failed because a saved task now loads back with extra fields. That was on purpose, so the tests changed from "exactly equal" to "everything kept"
+- The Area form's "Hours per month must be 0 or more." never showed: the browser's own `min="0"` check blocked the submit first. Fixed with `noValidate`, so the inline message always shows
+
+**Learned**
+- (fill in)
+
+**Checklist**
+- [x] Old local and cloud data load unchanged (tests for both)
+- [x] Tasks can be saved without a day, and survive a reload
+- [x] Google never gets an event for an unplaced task
+- [x] `npm run check` passes: 205 tests
+- [ ] Merged via PR, tagged v2.1

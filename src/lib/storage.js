@@ -1,20 +1,25 @@
 /*
   storage.js — saves and loads what the app needs to remember.
 
-  Five things now: the tasks, which category sections you collapsed, your
-  recurring chore templates, the days you deleted a chore on, and what has
-  been sent to Google Calendar. Each has its own key, so one can't damage
-  another.
+  Each thing has its own key, so one can't damage another: the tasks,
+  folded sections, recurring chore rules, the days you deleted a chore
+  on, what has been sent to Google Calendar, and since Phase 11 your
+  Areas, time entries, the running timer, away blocks and settings.
 
-  Three of them are plain lists and share one pair of helpers. The last is
-  a lookup from task id to event, so it gets its own pair.
+  The plain lists share one pair of helpers. Things with their own shape
+  (the Google record, settings, the timer) get their own pair.
 
-  In a later phase this file will talk to a cloud database instead, and
-  nothing else in the app will need to change.
+  How old saves are brought up to date lives in migrate.js, shared with
+  the cloud, so a task looks the same wherever it was loaded from.
 */
 
-import { CATEGORIES, DEFAULT_CATEGORY_ID } from '../config.js'
-import { makeStart, todayISO } from './dates.js'
+import {
+  migrateArea,
+  migrateSettings,
+  migrateTask,
+  migrateTimer,
+  onlyObjects,
+} from './migrate.js'
 
 const TASKS_KEY = 'dagen.tasks.v1'
 const COLLAPSED_KEY = 'dagen.collapsed.v1'
@@ -23,32 +28,11 @@ const SKIPPED_KEY = 'dagen.skipped.v1'
 const SENT_KEY = 'dagen.calendar.v1'
 const SYNCED_AT_KEY = 'dagen.syncedAt.v1'
 const CALENDAR_IDS_KEY = 'dagen.busyCalendars.v1'
-
-// Old saves are brought up to date as they load. This is a "migration":
-// old data, new shape. Two of them now:
-//
-//   1. Phase 1 tasks have no categoryId (categories didn't exist), and a
-//      task can point at a category you later renamed in config.js.
-//      Either way it gets the default category, so it can't vanish.
-//   2. Tasks saved before this phase have no time at all. Rather than
-//      guess silently, they're put at 09:00 today for half an hour AND
-//      marked tentative, which is exactly what tentative means: a time
-//      that needs a second look.
-function migrate(task) {
-  const known = CATEGORIES.some((category) => category.id === task.categoryId)
-  const withCategory = known
-    ? task
-    : { ...task, categoryId: DEFAULT_CATEGORY_ID }
-
-  if (withCategory.start) return withCategory
-
-  return {
-    ...withCategory,
-    start: makeStart(todayISO(), '09:00'),
-    durationMin: 30,
-    tentative: true,
-  }
-}
+const AREAS_KEY = 'dagen.areas.v1'
+const ENTRIES_KEY = 'dagen.entries.v1'
+const TIMER_KEY = 'dagen.timer.v1'
+const AWAY_KEY = 'dagen.away.v1'
+const SETTINGS_KEY = 'dagen.settings.v1'
 
 export function loadTasks() {
   try {
@@ -59,7 +43,8 @@ export function loadTasks() {
     // Someone could have put anything in storage. Only accept a real list.
     if (!Array.isArray(parsed)) return []
 
-    return parsed.map(migrate)
+    // onlyObjects drops anything that isn't a task-shaped object first.
+    return onlyObjects(parsed).map(migrateTask)
   } catch {
     // Blocked storage or damaged text: start empty rather than crash.
     return []
@@ -76,7 +61,7 @@ export function saveTasks(tasks) {
 
 // ---- plain lists ----
 //
-// Written once, used three times. Anything that goes wrong (nothing
+// Written once, used many times. Anything that goes wrong (nothing
 // saved, blocked storage, damaged text) comes back as an empty list, so
 // the app always starts.
 function loadList(key) {
@@ -95,7 +80,7 @@ function saveList(key, list) {
   try {
     localStorage.setItem(key, JSON.stringify(list))
   } catch {
-    // Storage full or switched off: harmless for all three of these.
+    // Storage full or switched off: the app keeps working, it just forgets.
   }
 }
 
@@ -175,4 +160,71 @@ export function loadBusyCalendars() {
 
 export function saveBusyCalendars(ids) {
   saveList(CALENDAR_IDS_KEY, ids)
+}
+
+// ---- Phase 11: Areas, time and settings ----
+
+// The things you're involved in. See areas.js.
+export function loadAreas() {
+  return onlyObjects(loadList(AREAS_KEY)).map(migrateArea)
+}
+
+export function saveAreas(areas) {
+  saveList(AREAS_KEY, areas)
+}
+
+// Tracked time. Nothing makes these until Phase 13, but they're loaded
+// and saved from now on so a save from a newer version is never lost.
+export function loadEntries() {
+  return onlyObjects(loadList(ENTRIES_KEY))
+}
+
+export function saveEntries(entries) {
+  saveList(ENTRIES_KEY, entries)
+}
+
+// Days you're away, when you have no capacity at all (Phase 15).
+export function loadAway() {
+  return onlyObjects(loadList(AWAY_KEY))
+}
+
+export function saveAway(blocks) {
+  saveList(AWAY_KEY, blocks)
+}
+
+// Reads one saved JSON value, or null if there's none or it's damaged.
+function loadValue(key) {
+  try {
+    const saved = localStorage.getItem(key)
+    return saved ? JSON.parse(saved) : null
+  } catch {
+    return null
+  }
+}
+
+function saveValue(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // As with the lists: forgetting is better than crashing.
+  }
+}
+
+// The one running timer, or null. Kept even across a reload (Phase 13).
+export function loadTimer() {
+  return migrateTimer(loadValue(TIMER_KEY))
+}
+
+export function saveTimer(timer) {
+  saveValue(TIMER_KEY, timer)
+}
+
+// Free hours per day, the active Area limit and rollover. Always comes
+// back complete: migrateSettings fills in anything missing.
+export function loadSettings() {
+  return migrateSettings(loadValue(SETTINGS_KEY))
+}
+
+export function saveSettings(settings) {
+  saveValue(SETTINGS_KEY, settings)
 }

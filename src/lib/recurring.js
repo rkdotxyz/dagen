@@ -10,8 +10,9 @@
   rule behind it.
 */
 
-import { splitStart, weekdayIndex } from './dates.js'
-import { makeStart } from './dates.js'
+import { makeStart, weekdayIndex } from './dates.js'
+import { TASK_DEFAULTS } from './migrate.js'
+import { dayOf } from './placement.js'
 
 // The id used to remember "I deleted this chore on this day, don't
 // bring it back". A template id and a day, joined.
@@ -36,15 +37,24 @@ export function missingTasks(templates, day, tasks, skipped) {
       (template) =>
         !tasks.some(
           (task) =>
-            task.templateId === template.id && splitStart(task.start).day === day,
+            // dayOf, not splitStart: a chore copy you unplaced has no
+            // start any more, and must still count as "already made".
+            task.templateId === template.id && dayOf(task) === day,
         ),
     )
     .filter((template) => !skipped.includes(skipKey(template.id, day)))
     .map((template) => ({
+      // Every Phase 11 field first, so a chore copy is a complete task.
+      ...TASK_DEFAULTS,
       templateId: template.id,
       categoryId: template.categoryId,
       title: template.title,
       start: makeStart(day, template.time),
+      day: day,
+      // Optional on a rule. Later phases let a rule say "KTH lecture,
+      // Tue 10:00, fixed, in the KTH courses Area".
+      areaId: template.areaId ?? null,
+      fixed: template.fixed ?? false,
       durationMin: template.durationMin,
       tentative: false,
       status: 'todo',

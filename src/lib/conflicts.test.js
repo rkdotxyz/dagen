@@ -78,3 +78,22 @@ describe('conflictsById', () => {
     expect(conflictsById([walk])).toEqual({})
   })
 })
+
+// Phase 11: a task can have no start. It has no hours, so it can't clash,
+// and checking it must not crash.
+describe('tasks with no start', () => {
+  const timed = task('a', '2026-11-27T10:00', 60)
+  const anytime = { id: 'b', title: 'b', start: null, day: '2026-11-27', durationMin: 60, status: 'todo' }
+  const unplaced = { id: 'c', title: 'c', start: null, day: null, durationMin: 60, status: 'todo' }
+
+  test('never overlap anything', () => {
+    expect(overlaps(timed, anytime)).toBe(false)
+    expect(overlaps(unplaced, timed)).toBe(false)
+    expect(overlaps(anytime, unplaced)).toBe(false)
+  })
+
+  test('are left out of the clash list', () => {
+    expect(conflictsById([timed, anytime, unplaced])).toEqual({})
+    expect(findConflicts(unplaced, [timed, anytime])).toEqual([])
+  })
+})

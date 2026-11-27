@@ -69,7 +69,15 @@ export function makeStart(day, time) {
   return `${day}T${time}`
 }
 
+// A moment as a start: "2026-11-27T15:10", in local time, to the minute.
+// Used to note when a task was ticked off (doneAt).
+export function toStart(date = new Date()) {
+  return makeStart(toISODate(date), toTime(date.getHours() * 60 + date.getMinutes()))
+}
+
 // "2026-10-05T14:30" -> { day: "2026-10-05", time: "14:30" }
+// Only call this with a real start. Since Phase 11 a task's start can be
+// null, so code that holds a task goes through placement.js instead.
 export function splitStart(start) {
   const [day, time] = start.split('T')
   return { day: day, time: time }

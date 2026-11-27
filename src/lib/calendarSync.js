@@ -28,6 +28,11 @@ export function signatureOf(task) {
 
 // Compares what was sent with what exists now.
 // Returns three lists: things to make, things to change, things to remove.
+//
+// Only TIMED tasks go to Google. A task with no start (placed "any time"
+// on a day, or not placed at all) has no slot to show. If one was sent
+// before, its event is removed: that's how unplacing a task, and later
+// rollover, take it off your calendar.
 export function planSync(sent, tasks) {
   const creates = []
   const updates = []
@@ -35,6 +40,11 @@ export function planSync(sent, tasks) {
 
   for (const task of tasks) {
     const previous = sent[task.id]
+
+    if (!task.start) {
+      if (previous) deletes.push({ taskId: task.id, eventId: previous.eventId })
+      continue
+    }
 
     if (!previous) {
       creates.push(task)

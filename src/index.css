@@ -106,7 +106,9 @@ h1 {
   margin: 0;
 }
 
-.repeats-button {
+/* The two panel buttons sit together on the right. The first one takes
+   all the spare room on its left, which pushes both across. */
+.areas-button {
   margin-left: auto;
 }
 
@@ -398,4 +400,100 @@ h1 {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+/* ---------- Phase 11: Areas, To place ---------- */
+
+/* An Area's name on a task row. Archived ones fade, but keep their name
+   so old tasks still say where they belonged. */
+.task-area.archived,
+.area.archived {
+  opacity: 0.55;
+}
+
+.area {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+}
+
+/* The "are you sure?" line is longer, so its buttons may drop below. */
+.area.confirm {
+  flex-wrap: wrap;
+}
+
+/* The edit form fills the whole row instead of sitting beside a dot. */
+.area .area-form {
+  flex: 1;
+}
+
+.area-text {
+  flex: 1;
+  /* min-width: 0 lets long names wrap instead of pushing the buttons
+     off the row on a narrow phone. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.area.confirm .area-text {
+  color: var(--warn);
+}
+
+.panel-subhead {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--muted);
+  margin: 1.2rem 0 0.4rem;
+}
+
+/* "1 active" beside the panel's heading. */
+.heading-note {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-left: 0.4rem;
+}
+
+/* An inline validation message, right under the fields it's about. */
+.field-error {
+  margin: 0;
+  color: var(--drawably-error);
+  font-size: 0.9rem;
+}
+
+/* A number box doesn't need to be wide. */
+.form-row .budget-field {
+  flex: 0 1 6rem;
+  min-width: 5rem;
+}
+
+.settings-row {
+  margin-bottom: 0.6rem;
+}
+
+/* A label above its list: "Free hours, weekdays" then the hours. */
+.setting {
+  flex: 1;
+  min-width: 9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* The To place heading isn't a fold button, but should look like the
+   category headings above it. */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 400;
+  margin: 0;
+}
+
+.to-place {
+  margin-top: 1.5rem;
 }
