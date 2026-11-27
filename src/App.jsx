@@ -20,6 +20,9 @@
   budgets. Its sums include weekly chores and lectures as previews
   (recurring.js), so a month of copies is never saved or sent to Google.
 
+  Since Phase 15 there's a Quarter screen (triage, a timeline, outcomes),
+  and away blocks can be added in the Areas panel.
+
   Since Phase 13 it runs the one timer (timer.js): starting a task stops
   whatever ran before, every stop saves one time entry, and both the
   timer and the entries are saved, here and in the cloud.
@@ -43,6 +46,7 @@ import TimeLog from './components/TimeLog.jsx'
 import Toast from './components/Toast.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
 import MonthView from './components/MonthView.jsx'
+import QuarterView from './components/QuarterView.jsx'
 import WeekView from './components/WeekView.jsx'
 import { CATEGORIES, DEFAULT_CATEGORY_ID, TABS, getCategory } from './config.js'
 import { createArea, removeArea, updateArea } from './lib/areas.js'
@@ -222,6 +226,8 @@ function App() {
   const [weekDay, setWeekDay] = useState(() => todayISO())
   // And the Month screen's place: any day in the month it shows.
   const [monthDay, setMonthDay] = useState(() => todayISO())
+  // And the Quarter screen's: its three months start from this day's month.
+  const [quarterDay, setQuarterDay] = useState(() => todayISO())
   // The day the rollover question was last answered.
   const [rolloverAsked, setRolloverAsked] = useState(() => loadRolloverAsked())
   // The message at the bottom: { message, actionLabel?, onAction? } or null.
@@ -808,6 +814,32 @@ function App() {
     setAreas(updateArea(areas, id, changes))
   }
 
+  // ---- Away blocks (Phase 15) ----
+
+  function addAway(details) {
+    setAway([...away, { id: `w_${makeId()}`, ...details }])
+  }
+
+  function changeAway(id, changes) {
+    setAway(away.map((block) => (block.id === id ? { ...block, ...changes } : block)))
+  }
+
+  function deleteAway(id) {
+    const block = away.find((item) => item.id === id)
+    if (!block) return
+    setAway(away.filter((item) => item.id !== id))
+    setToast({
+      message: `Deleted ${block.title}.`,
+      actionLabel: 'Undo',
+      onAction: () => {
+        setAway((current) =>
+          current.some((item) => item.id === block.id) ? current : [...current, block],
+        )
+        setToast(null)
+      },
+    })
+  }
+
   // Archives an Area that's in use, deletes one that isn't (areas.js).
   function deleteArea(id) {
     setAreas(removeArea(areas, id, tasks, entries))
@@ -851,7 +883,7 @@ function App() {
 
   return (
     // The Week screen needs more room than a phone column on a computer.
-    <main className={tab === 'week' || tab === 'month' ? 'app wide' : 'app'}>
+    <main className={tab === 'day' ? 'app' : 'app wide'}>
       <header className="app-header">
         <h1>Dagen</h1>
         {tab === 'day' && (
@@ -956,6 +988,10 @@ function App() {
           onUpdate={changeArea}
           onRemove={deleteArea}
           onChangeSettings={setSettings}
+          away={away}
+          onAddAway={addAway}
+          onChangeAway={changeAway}
+          onDeleteAway={deleteAway}
         />
       )}
 
@@ -1083,6 +1119,21 @@ function App() {
           onThisMonth={() => setMonthDay(today)}
           onOpenDay={openDay}
           onChangeBudget={(id, hours) => changeArea(id, { monthlyBudgetHours: hours })}
+        />
+      )}
+
+      {tab === 'quarter' && (
+        <QuarterView
+          quarterDay={quarterDay}
+          today={today}
+          tasks={tasks}
+          areas={areas}
+          entries={entries}
+          away={away}
+          settings={settings}
+          onShiftQuarter={(amount) => setQuarterDay(shiftMonth(quarterDay, amount * 3))}
+          onThisQuarter={() => setQuarterDay(today)}
+          onChangeArea={changeArea}
         />
       )}
 

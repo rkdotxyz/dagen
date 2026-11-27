@@ -12,7 +12,11 @@
   file only draws and reports.
 
   Below the list are the planner's settings: free hours per day, the
-  active Area limit, and rollover. Later phases put them to work.
+  active Area limit, and rollover.
+
+  Since Phase 15 an Area can have start and end days (they draw its bar
+  on the Quarter timeline), and the panel lists your away blocks: trips
+  and holidays, when a day has no capacity at all.
 */
 
 import { useState } from 'react'
@@ -23,6 +27,7 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Switch } from '@/components/ui/switch'
 import { CATEGORIES, getCategory } from '../config.js'
+import { awayProblem, describeAway, sortedAway } from '../lib/away.js'
 import {
   AREA_STATUSES,
   STATUS_NAMES,
@@ -45,6 +50,9 @@ function AreaForm({ area, onSubmit, onCancel }) {
   // Kept as text: a number box can be empty for a moment while you type.
   const [budget, setBudget] = useState(() => String(area?.monthlyBudgetHours ?? 0))
   const [outcome, setOutcome] = useState(() => area?.outcome ?? '')
+  // Optional: when this Area runs, for the Quarter timeline.
+  const [startDay, setStartDay] = useState(() => area?.startDay ?? '')
+  const [endDay, setEndDay] = useState(() => area?.endDay ?? '')
   const [error, setError] = useState(null)
 
   function handleSubmit(event) {
@@ -62,6 +70,11 @@ function AreaForm({ area, onSubmit, onCancel }) {
       return
     }
 
+    if (startDay && endDay && endDay < startDay) {
+      setError('The end can’t be before the start.')
+      return
+    }
+
     setError(null)
     onSubmit({
       name: trimmed,
@@ -69,11 +82,15 @@ function AreaForm({ area, onSubmit, onCancel }) {
       status: status,
       monthlyBudgetHours: hours,
       outcome: outcome.trim(),
+      startDay: startDay || null,
+      endDay: endDay || null,
     })
 
     if (!area) {
       setName('')
       setOutcome('')
+      setStartDay('')
+      setEndDay('')
     }
   }
 
@@ -139,6 +156,27 @@ function AreaForm({ area, onSubmit, onCancel }) {
         placeholder="Outcome this quarter (optional)"
         aria-label="Outcome this quarter"
       />
+
+      <div className="form-row">
+        <label className="setting">
+          Runs from (optional)
+          <Input
+            className="field"
+            type="date"
+            value={startDay}
+            onChange={(event) => setStartDay(event.target.value)}
+          />
+        </label>
+        <label className="setting">
+          Until (optional)
+          <Input
+            className="field"
+            type="date"
+            value={endDay}
+            onChange={(event) => setEndDay(event.target.value)}
+          />
+        </label>
+      </div>
 
       {/* role="alert" makes a screen reader read the problem out. */}
       {error && (
@@ -256,6 +294,134 @@ function AreaRow({ area, tasks, entries, onUpdate, onRemove }) {
   )
 }
 
+// The add and edit form for an away block.
+function AwayForm({ block, onSave, onCancel }) {
+  const [title, setTitle] = useState(() => block?.title ?? '')
+  const [startDay, setStartDay] = useState(() => block?.startDay ?? '')
+  const [endDay, setEndDay] = useState(() => block?.endDay ?? '')
+  const [error, setError] = useState(null)
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    const problem = awayProblem({ title: title, startDay: startDay, endDay: endDay })
+    if (problem) {
+      setError(problem)
+      return
+    }
+    setError(null)
+    onSave({ title: title.trim(), startDay: startDay, endDay: endDay })
+    if (!block) {
+      setTitle('')
+      setStartDay('')
+      setEndDay('')
+    }
+  }
+
+  return (
+    <form className="task-form area-form" onSubmit={handleSubmit} noValidate>
+      <Input
+        className="field"
+        type="text"
+        value={title}
+        onChange={(event) => setTitle(event.target.value)}
+        placeholder="Winter trip"
+        aria-label={block ? `Name of ${block.title}` : 'New away block name'}
+        autoFocus={Boolean(block)}
+      />
+      <div className="form-row">
+        <label className="setting">
+          First day away
+          <Input
+            className="field"
+            type="date"
+            value={startDay}
+            onChange={(event) => setStartDay(event.target.value)}
+          />
+        </label>
+        <label className="setting">
+          Last day away
+          <Input
+            className="field"
+            type="date"
+            value={endDay}
+            onChange={(event) => setEndDay(event.target.value)}
+          />
+        </label>
+      </div>
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="form-row">
+        <Button type="submit">{block ? 'Save' : 'Add away time'}</Button>
+        {onCancel && (
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
+      </div>
+    </form>
+  )
+}
+
+// Trips and holidays: days with no capacity at all. They aren't sent to
+// Google Calendar.
+function AwaySection({ away, onAdd, onChange, onDelete }) {
+  const [editingId, setEditingId] = useState(null)
+
+  return (
+    <section aria-label="Away">
+      <h3 className="panel-subhead">Away</h3>
+      {away.length === 0 ? (
+        <p className="empty">No trips yet. Days you&apos;re away have no free hours.</p>
+      ) : (
+        <ul className="template-list">
+          {sortedAway(away).map((block) =>
+            block.id === editingId ? (
+              <li key={block.id} className="area">
+                <AwayForm
+                  block={block}
+                  onSave={(changes) => {
+                    onChange(block.id, changes)
+                    setEditingId(null)
+                  }}
+                  onCancel={() => setEditingId(null)}
+                />
+              </li>
+            ) : (
+              <li key={block.id} className="area">
+                <span className="area-text">
+                  <span>{block.title}</span>
+                  <span className="task-when">{describeAway(block)}</span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setEditingId(block.id)}
+                  aria-label={`Edit ${block.title}`}
+                >
+                  <PencilIcon />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => onDelete(block.id)}
+                  aria-label={`Delete ${block.title}`}
+                >
+                  <XIcon />
+                </Button>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+      <AwayForm onSave={onAdd} />
+    </section>
+  )
+}
+
 function AreasPanel({
   areas,
   tasks,
@@ -265,6 +431,10 @@ function AreasPanel({
   onUpdate,
   onRemove,
   onChangeSettings,
+  away = [],
+  onAddAway,
+  onChangeAway,
+  onDeleteAway,
 }) {
   const live = areas.filter((area) => !area.archived)
   const archived = areas.filter((area) => area.archived)
@@ -396,9 +566,12 @@ function AreasPanel({
           Offer to roll over unfinished tasks each morning
         </label>
 
-        <p className="form-summary">
-          Free hours and rollover start working with the Week view (next phase).
-        </p>
+        <AwaySection
+          away={away}
+          onAdd={onAddAway}
+          onChange={onChangeAway}
+          onDelete={onDeleteAway}
+        />
         </CardContent>
       </Card>
     </section>

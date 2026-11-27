@@ -255,3 +255,32 @@
 - [x] Deadline labels land on the right day
 - [x] `npm run check` passes: 312 tests
 - [ ] Merged via PR, tagged v2.4
+
+
+## Phase 15: Quarter view and away blocks (v2.5)
+
+**Date:** 2026-11-28
+
+**What I did**
+- `quarter.js`: a rolling three months from a chosen month, status cycling (active → maintain → paused), which Areas get a lane, each lane's bar and markers, away bands, and tracked hours against three months of budget
+- `placeLabels`: a pure function that puts each marker's label right, flips it left, shortens it, or hides it, so labels never cover a marker or each other. Tested with a "nothing overlaps" check over a crowded lane
+- The Quarter tab: "6 active Areas this quarter, more than 5", ‹ › by three months
+- Triage: Active · Maintain · Paused. Tapping an Area moves it to the next column (saved)
+- Timeline: month names and week ticks, one lane per Area with dates or dated things, a bar from start to end, round markers for deadlines, square ones for one-off fixed events, away blocks hatched across all lanes, a red line for today. Scrolls sideways inside its own box on a phone
+- Outcomes: each active Area's goal (or a prompt to write one, edited in place) and "tracked / budget × 3" hours
+- Areas can have start and end days. Away blocks can be added, edited and deleted (with Undo) in the Areas panel; days inside them have no free hours on every screen
+- Removed the old note in the Areas panel that said free hours start working "next phase"
+
+**What broke and how I fixed it**
+- (fill in)
+- A test run crossed midnight and a timer test failed: a timer started 30 minutes earlier now belonged to yesterday, which is right. The test now opens the day the entry started on (going back a week if that's a Monday's yesterday)
+- Triage chips were centred and cut to "Räck…" on a phone: the Button's own classes win over the stylesheet, and three columns are too narrow at 360px. A Tailwind class aligns them, and the columns stack on phones
+
+**Learned**
+- (fill in)
+
+**Checklist**
+- [x] Status cycling, which lanes are drawn, and label placement are tested
+- [x] Away days have no capacity in Day, Week, Month and Quarter
+- [x] `npm run check` passes: 336 tests
+- [ ] Merged via PR, tagged v2.5
