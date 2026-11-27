@@ -176,3 +176,34 @@ describe('applyPlan', () => {
     reported.mockRestore()
   })
 })
+
+// Phase 11: only timed tasks belong on Google Calendar.
+describe('planSync with tasks that have no start', () => {
+  const unplaced = { ...laundry, start: null, day: null }
+  const anytime = { ...laundry, start: null, day: '2026-10-05' }
+
+  test('an unplaced task is never sent', () => {
+    expect(isEmptyPlan(planSync({}, [unplaced]))).toBe(true)
+  })
+
+  test('an any-time task is never sent either: it has no slot', () => {
+    expect(isEmptyPlan(planSync({}, [anytime]))).toBe(true)
+  })
+
+  test('unplacing a task that was sent deletes its event', () => {
+    const plan = planSync(sentLaundry, [unplaced])
+    expect(plan.deletes).toEqual([{ taskId: 't1', eventId: 'event-1' }])
+    expect(plan.creates).toEqual([])
+    expect(plan.updates).toEqual([])
+  })
+
+  test('placing it again makes a fresh event', () => {
+    // After the delete, the record no longer has t1.
+    expect(planSync({}, [laundry]).creates).toEqual([laundry])
+  })
+
+  test('the signature of a timed task is unchanged by the new fields', () => {
+    const withNewFields = { ...laundry, day: '2026-10-05', areaId: 'a_rk', rolled: 1 }
+    expect(signatureOf(withNewFields)).toBe(signatureOf(laundry))
+  })
+})

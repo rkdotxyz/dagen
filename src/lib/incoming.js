@@ -12,6 +12,8 @@
   ignored. Creation stays app-only, as the plan says.
 */
 
+import { withDay } from './placement.js'
+
 const TASK_ID_KEY = 'dagenTaskId'
 
 // The hidden id Dagen put on the event, or null if this isn't ours.
@@ -74,6 +76,17 @@ export function applyIncoming(events, tasks, sent, signatureOf) {
     const task = tasksNow.find((item) => item.id === taskId)
     if (!task) continue // already gone from this device
 
+    // A task with no start isn't on Google any more. Whatever comes back
+    // for it (including the "cancelled" from Dagen removing its event)
+    // is old news, and must not delete or re-time the task.
+    if (!task.start) continue
+
+    // The task has a newer event than this one: it was unplaced, then
+    // placed again, which made a fresh event. The old one's "cancelled"
+    // must not delete the task.
+    const known = sentNow[taskId]
+    if (known && known.eventId !== event.id) continue
+
     // An event Google reports as "cancelled" was deleted over there.
     if (event.status === 'cancelled') {
       tasksNow = tasksNow.filter((item) => item.id !== taskId)
@@ -86,7 +99,8 @@ export function applyIncoming(events, tasks, sent, signatureOf) {
     // always have a time, so leave those alone.
     if (!event.start?.dateTime || !event.end?.dateTime) continue
 
-    const updated = { ...task, ...changesFrom(event) }
+    // withDay keeps the task's day in step with its new start.
+    const updated = withDay({ ...task, ...changesFrom(event) })
     if (signatureOf(updated) === signatureOf(task)) continue // no real change
 
     tasksNow = tasksNow.map((item) => (item.id === taskId ? updated : item))

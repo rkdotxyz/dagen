@@ -2,6 +2,12 @@
   TaskItem.jsx — one task row: when it happens, what it is, and whether
   anything is wrong with that plan.
 
+  Since Phase 11 the "when" line has three forms, one per placement:
+    "Today · 14:00–15:30"   timed
+    "Today · Any time · 1h" on a day, no hour
+    "Not placed · 1h"       waiting in To place
+  and a task's Area follows it, greyed out if that Area was archived.
+
   It still changes nothing itself. It reports taps upwards and draws what
   it's given. Since Phase 10 the row is a sketched card, and the controls
   inside it are drawably's: real inputs and buttons underneath, with a pen
@@ -14,11 +20,23 @@ import {
   DrawablyCard,
   DrawablyCheckbox,
 } from 'drawably/react'
-import { formatDay, formatRange, splitStart } from '../lib/dates.js'
+import { formatDay, formatDuration, formatRange } from '../lib/dates.js'
+import { dayOf, placementOf } from '../lib/placement.js'
 
-function TaskItem({ task, conflicts, onToggle, onEdit, onDelete }) {
+// The "when" line, in words.
+function describeWhen(task) {
+  const placement = placementOf(task)
+  if (placement === 'timed') {
+    return `${formatDay(dayOf(task))} · ${formatRange(task.start, task.durationMin)}`
+  }
+  if (placement === 'anytime') {
+    return `${formatDay(dayOf(task))} · Any time · ${formatDuration(task.durationMin)}`
+  }
+  return `Not placed · ${formatDuration(task.durationMin)}`
+}
+
+function TaskItem({ task, area = null, conflicts, onToggle, onEdit, onDelete }) {
   const isDone = task.status === 'done'
-  const { day } = splitStart(task.start)
 
   // The row's state as class names. The CSS uses "clash" and "done" to
   // change the pen colour of everything drawn inside the row.
@@ -49,7 +67,13 @@ function TaskItem({ task, conflicts, onToggle, onEdit, onDelete }) {
             </span>
 
             <span className="task-when">
-              {formatDay(day)} · {formatRange(task.start, task.durationMin)}
+              {describeWhen(task)}
+              {area && (
+                <span className={area.archived ? 'task-area archived' : 'task-area'}>
+                  {' · '}
+                  {area.name}
+                </span>
+              )}
             </span>
 
             {conflicts.length > 0 && (

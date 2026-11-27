@@ -2,6 +2,9 @@
   CategorySection.jsx — one category: its header, its tasks in time order,
   and its own add panel.
 
+  Since Phase 11 it also passes the Areas down: the form offers them,
+  and each row shows the name of the Area its task belongs to.
+
   It owns two small things: whether the add panel is open, and which task
   is being edited. Everything that outlives a redraw is owned by App.
 */
@@ -10,9 +13,11 @@ import { useState } from 'react'
 import { DrawablyBadge, DrawablyButton, DrawablyDivider } from 'drawably/react'
 import TaskForm from './TaskForm.jsx'
 import TaskItem from './TaskItem.jsx'
+import { findArea } from '../lib/areas.js'
 
 function CategorySection({
   category,
+  areas = [],
   tasks,
   allTasks,
   conflicts,
@@ -66,7 +71,9 @@ function CategorySection({
         <>
           {isAdding && (
             <TaskForm
+              categoryId={category.id}
               categoryName={category.name}
+              areas={areas}
               tasks={allTasks}
               defaultDay={selectedDay}
               onSubmit={(details) => onAdd(category.id, details)}
@@ -82,7 +89,9 @@ function CategorySection({
                 task.id === editingId ? (
                   <li key={task.id}>
                     <TaskForm
+                      categoryId={category.id}
                       categoryName={category.name}
+                      areas={areas}
                       tasks={allTasks}
                       task={task}
                       onSubmit={(details) => {
@@ -96,6 +105,7 @@ function CategorySection({
                   <TaskItem
                     key={task.id}
                     task={task}
+                    area={findArea(areas, task.areaId)}
                     conflicts={conflicts[task.id] ?? []}
                     onToggle={onToggleTask}
                     onEdit={setEditingId}

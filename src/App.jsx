@@ -5,17 +5,25 @@
   looking at. Everything else is worked out from those three on every
   redraw: the week in the strip, the markers on it, the clashes, and the
   tasks each section shows.
+
+  Since Phase 11 it also owns your Areas and settings, and carries the
+  time entries, running timer and away blocks that later phases fill in.
+  A task can now have no day (it waits in To place) or a day with no
+  time (any time). Anything that needs a task's day asks placement.js.
 */
 
 import { useEffect, useRef, useState } from 'react'
 import { DrawablyButton } from 'drawably/react'
 import AccountBar from './components/AccountBar.jsx'
+import AreasPanel from './components/AreasPanel.jsx'
 import CalendarBar from './components/CalendarBar.jsx'
 import CalendarPicker from './components/CalendarPicker.jsx'
 import CategorySection from './components/CategorySection.jsx'
 import TemplatePanel from './components/TemplatePanel.jsx'
+import ToPlaceSection from './components/ToPlaceSection.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
 import { CATEGORIES, getCategory } from './config.js'
+import { createArea, removeArea, updateArea } from './lib/areas.js'
 import { toBusyBlocks } from './lib/busy.js'
 import { applyPlan, isEmptyPlan, planSync, signatureOf } from './lib/calendarSync.js'
 import { loadPlanner, savePlanner } from './lib/cloud.js'
@@ -35,12 +43,24 @@ import {
   addDays,
   formatDay,
   formatMonthLabel,
-  splitStart,
   toMinutes,
+  toStart,
   todayISO,
   weekDays,
 } from './lib/dates.js'
+import { TASK_DEFAULTS } from './lib/migrate.js'
+import { dayOf, placementOf, timeOf, withDay } from './lib/placement.js'
 import {
+  loadAreas,
+  loadAway,
+  loadEntries,
+  loadSettings,
+  loadTimer,
+  saveAreas,
+  saveAway,
+  saveEntries,
+  saveSettings,
+  saveTimer,
   loadBusyCalendars,
   loadCollapsed,
   loadSent,
@@ -80,11 +100,23 @@ function fillChores(tasks, day, templates, skipped) {
   return [...tasks, ...extra.map((task) => ({ id: makeId(), ...task }))]
 }
 
+// Earliest first. Within a day, timed tasks come in clock order and
+// "any time" ones after them. Tasks with no day at all go last.
 function byTime(a, b) {
-  const first = splitStart(a.start)
-  const second = splitStart(b.start)
-  if (first.day !== second.day) return first.day < second.day ? -1 : 1
-  return toMinutes(first.time) - toMinutes(second.time)
+  const firstDay = dayOf(a)
+  const secondDay = dayOf(b)
+  if (firstDay !== secondDay) {
+    if (firstDay === null) return 1
+    if (secondDay === null) return -1
+    return firstDay < secondDay ? -1 : 1
+  }
+
+  const firstTime = timeOf(a)
+  const secondTime = timeOf(b)
+  if (firstTime === secondTime) return 0
+  if (firstTime === null) return 1
+  if (secondTime === null) return -1
+  return toMinutes(firstTime) - toMinutes(secondTime)
 }
 
 // What the week strip shows under each day: how many tasks are still to
@@ -95,7 +127,10 @@ function dayMarkers(tasks, conflicts) {
   for (const task of tasks) {
     if (task.status === 'done') continue
 
-    const { day } = splitStart(task.start)
+    // A task with no day has nowhere on the strip to be counted.
+    const day = dayOf(task)
+    if (day === null) continue
+
     const marker = markers[day] ?? { count: 0, hasConflict: false }
 
     marker.count += 1
@@ -136,6 +171,16 @@ function App() {
   const [calendars, setCalendars] = useState([])
   const [busyCalendars, setBusyCalendars] = useState(() => loadBusyCalendars())
   const [showCalendars, setShowCalendars] = useState(false)
+  // Phase 11: the things you're involved in, and the planner's settings.
+  // Entries, the timer and away blocks have no screens yet (Phases 13
+  // and 15), but they're loaded and saved already, so nothing written by
+  // a newer version on another device is ever thrown away here.
+  const [areas, setAreas] = useState(() => loadAreas())
+  const [settings, setSettings] = useState(() => loadSettings())
+  const [entries, setEntries] = useState(() => loadEntries())
+  const [activeTimer, setActiveTimer] = useState(() => loadTimer())
+  const [away, setAway] = useState(() => loadAway())
+  const [showAreas, setShowAreas] = useState(false)
 
   useEffect(() => {
     saveTasks(tasks)
@@ -160,6 +205,26 @@ function App() {
   useEffect(() => {
     saveBusyCalendars(busyCalendars)
   }, [busyCalendars])
+
+  useEffect(() => {
+    saveAreas(areas)
+  }, [areas])
+
+  useEffect(() => {
+    saveSettings(settings)
+  }, [settings])
+
+  useEffect(() => {
+    saveEntries(entries)
+  }, [entries])
+
+  useEffect(() => {
+    saveTimer(activeTimer)
+  }, [activeTimer])
+
+  useEffect(() => {
+    saveAway(away)
+  }, [away])
 
   // A mirror of the two lists that incoming changes need. Reading them
   // through a ref means the sync below doesn't have to restart every time
@@ -202,6 +267,11 @@ function App() {
           templates: templates,
           skipped: skipped,
           collapsed: collapsed,
+          areas: areas,
+          entries: entries,
+          activeTimer: activeTimer,
+          away: away,
+          settings: settings,
         })
         return
       }
@@ -210,6 +280,11 @@ function App() {
       setTemplates(planner.templates)
       setSkipped(planner.skipped)
       setCollapsed(planner.collapsed)
+      setAreas(planner.areas)
+      setEntries(planner.entries)
+      setActiveTimer(planner.activeTimer)
+      setAway(planner.away)
+      setSettings(planner.settings)
     })
 
     return () => {
@@ -233,11 +308,16 @@ function App() {
         templates: templates,
         skipped: skipped,
         collapsed: collapsed,
+        areas: areas,
+        entries: entries,
+        activeTimer: activeTimer,
+        away: away,
+        settings: settings,
       }).then(() => setSyncing(false))
     }, 800)
 
     return () => clearTimeout(timer)
-  }, [session, tasks, templates, skipped, collapsed])
+  }, [session, tasks, templates, skipped, collapsed, areas, entries, activeTimer, away, settings])
 
   // The permission to touch your calendar, handed over by Google when you
   // connect. It lives on the session, and lasts about an hour.
@@ -365,21 +445,36 @@ function App() {
     }
   }, [calendarToken, busyCalendars, selectedDay])
 
+  // A new task gets every Phase 11 field. The details come last, so
+  // anything the form chose (including a category set by an Area) wins.
+  // withDay keeps day in step with start.
   function addTask(categoryId, details) {
     setTasks([
       ...tasks,
-      { id: makeId(), categoryId: categoryId, status: 'todo', ...details },
+      withDay({
+        ...TASK_DEFAULTS,
+        id: makeId(),
+        categoryId: categoryId,
+        status: 'todo',
+        ...details,
+      }),
     ])
   }
 
   // Changes some fields of one task and leaves the rest alone.
   function updateTask(id, changes) {
-    setTasks(tasks.map((task) => (task.id === id ? { ...task, ...changes } : task)))
+    setTasks(
+      tasks.map((task) => (task.id === id ? withDay({ ...task, ...changes }) : task)),
+    )
   }
 
+  // Ticking notes the moment (doneAt), which the Insights screen will use
+  // later. Unticking clears it again.
   function toggleTask(id) {
+    const isDone = tasks.find((task) => task.id === id).status === 'done'
     updateTask(id, {
-      status: tasks.find((task) => task.id === id).status === 'done' ? 'todo' : 'done',
+      status: isDone ? 'todo' : 'done',
+      doneAt: isDone ? null : toStart(),
     })
   }
 
@@ -388,8 +483,10 @@ function App() {
 
     // Deleting a chore means "not this time", not "stop the rule". Note
     // the day so it isn't made again the next time you open that day.
-    if (task?.templateId) {
-      setSkipped([...skipped, skipKey(task.templateId, splitStart(task.start).day)])
+    // A chore copy you unplaced has no day, so there's nothing to note.
+    const day = task ? dayOf(task) : null
+    if (task?.templateId && day) {
+      setSkipped([...skipped, skipKey(task.templateId, day)])
     }
 
     setTasks(tasks.filter((item) => item.id !== id))
@@ -417,6 +514,21 @@ function App() {
     setTemplates(templates.filter((template) => template.id !== id))
   }
 
+  // ---- Areas ----
+
+  function addArea(details) {
+    setAreas([...areas, createArea(details, `a_${makeId()}`)])
+  }
+
+  function changeArea(id, changes) {
+    setAreas(updateArea(areas, id, changes))
+  }
+
+  // Archives an Area that's in use, deletes one that isn't (areas.js).
+  function deleteArea(id) {
+    setAreas(removeArea(areas, id, tasks, entries))
+  }
+
   function toggleCollapse(categoryId) {
     setCollapsed(
       collapsed.includes(categoryId)
@@ -432,9 +544,13 @@ function App() {
   const markers = dayMarkers(tasks, conflicts)
 
   // Only the selected day's tasks reach the sections, earliest first.
-  const dayTasks = [...tasks]
-    .filter((task) => splitStart(task.start).day === selectedDay)
-    .sort(byTime)
+  // That includes the ones placed "any time" on it.
+  const dayTasks = [...tasks].filter((task) => dayOf(task) === selectedDay).sort(byTime)
+
+  // Tasks with no day yet, still to do.
+  const toPlace = tasks.filter(
+    (task) => placementOf(task) === 'unplaced' && task.status !== 'done',
+  )
 
   return (
     <main className="app">
@@ -443,6 +559,15 @@ function App() {
         <p className="today">{formatDay(selectedDay, new Date(`${today}T12:00`))}</p>
 
         {/* Drawn solid while its panel is open, outline when closed. */}
+        <DrawablyButton
+          className="areas-button"
+          variant={showAreas ? 'solid' : 'outline'}
+          onClick={() => setShowAreas(!showAreas)}
+          aria-expanded={showAreas}
+        >
+          Areas
+        </DrawablyButton>
+
         <DrawablyButton
           className="repeats-button"
           variant={showTemplates ? 'solid' : 'outline'}
@@ -501,6 +626,19 @@ function App() {
         />
       )}
 
+      {showAreas && (
+        <AreasPanel
+          areas={areas}
+          tasks={tasks}
+          entries={entries}
+          settings={settings}
+          onAdd={addArea}
+          onUpdate={changeArea}
+          onRemove={deleteArea}
+          onChangeSettings={setSettings}
+        />
+      )}
+
       {showTemplates && (
         <TemplatePanel
           templates={templates}
@@ -525,6 +663,7 @@ function App() {
         <CategorySection
           key={category.id}
           category={category}
+          areas={areas}
           tasks={dayTasks.filter((task) => task.categoryId === category.id)}
           allTasks={tasks}
           conflicts={conflicts}
@@ -537,6 +676,15 @@ function App() {
           onDeleteTask={deleteTask}
         />
       ))}
+
+      <ToPlaceSection
+        tasks={toPlace}
+        areas={areas}
+        allTasks={tasks}
+        onUpdateTask={updateTask}
+        onToggleTask={toggleTask}
+        onDeleteTask={deleteTask}
+      />
     </main>
   )
 }

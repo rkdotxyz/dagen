@@ -459,3 +459,232 @@ test('chores survive a reload, without doubling up', () => {
 
   expect(within(section('Meals')).getAllByText('Cook dinner')).toHaveLength(1)
 })
+
+// ---- Phase 11: unplaced tasks, any time, and Areas ----
+
+function toPlace() {
+  return within(section('To place'))
+}
+
+// Opens a category's add form, types a title, and hands back the form
+// so the test can set whatever else it's checking.
+function startAdding(categoryName, title) {
+  fireEvent.click(screen.getByLabelText(`Add to ${categoryName}`))
+  const form = within(section(categoryName))
+  fireEvent.change(form.getByLabelText(`New task in ${categoryName}`), {
+    target: { value: title },
+  })
+  return form
+}
+
+function submitAndClose(form, categoryName) {
+  fireEvent.submit(form.getByLabelText(`New task in ${categoryName}`).closest('form'))
+  fireEvent.click(form.getByRole('button', { name: 'Done' }))
+}
+
+test('a task saved with "No day yet" waits in To place, not on the day', () => {
+  render(<App />)
+  const form = startAdding('Personal', 'Update CV')
+  fireEvent.click(form.getByRole('button', { name: 'No day yet' }))
+  submitAndClose(form, 'Personal')
+
+  expect(within(section('Personal')).queryByText('Update CV')).toBeNull()
+  expect(toPlace().getByText('Update CV')).toBeTruthy()
+  expect(toPlace().getByText(/Not placed · 30m/)).toBeTruthy()
+  // And it doesn't count on the week strip.
+  expect(dayButton(/^Today$/)).toBeTruthy()
+})
+
+test('an unplaced task survives a reload and can be given a day', () => {
+  render(<App />)
+  const form = startAdding('Personal', 'Update CV')
+  fireEvent.click(form.getByRole('button', { name: 'No day yet' }))
+  submitAndClose(form, 'Personal')
+
+  cleanup()
+  render(<App />)
+
+  expect(toPlace().getByText('Update CV')).toBeTruthy()
+
+  fireEvent.click(toPlace().getByLabelText('Edit Update CV'))
+  fireEvent.change(toPlace().getByLabelText('Day'), { target: { value: todayISO() } })
+  fireEvent.change(toPlace().getByLabelText('Start time'), { target: { value: '10:00' } })
+  fireEvent.click(toPlace().getByRole('button', { name: 'Save' }))
+
+  expect(toPlace().queryByText('Update CV')).toBeNull()
+  expect(within(section('Personal')).getByText(/10:00–10:30/)).toBeTruthy()
+})
+
+test('"Any time" keeps a task on the day, after the timed ones, with no clash', () => {
+  render(<App />)
+  addTo('Chores', { title: 'Laundry', time: '10:00', durationMin: 60 })
+
+  const form = startAdding('Chores', 'Tidy desk')
+  fireEvent.change(form.getByLabelText('Start time'), { target: { value: '' } })
+  submitAndClose(form, 'Chores')
+
+  const chores = within(section('Chores'))
+  expect(chores.getByText(/Any time · 30m/)).toBeTruthy()
+  const titles = chores.getAllByText(/Laundry|Tidy desk/).map((node) => node.textContent)
+  expect(titles).toEqual(['Laundry', 'Tidy desk'])
+  expect(screen.queryByText(/Overlaps/)).toBeNull()
+  expect(dayButton(/^Today, 2 tasks$/)).toBeTruthy()
+})
+
+test('the time list is switched off until there is a day', () => {
+  render(<App />)
+  const form = startAdding('Chores', 'Something')
+  fireEvent.click(form.getByRole('button', { name: 'No day yet' }))
+
+  expect(form.getByLabelText('Start time').disabled).toBe(true)
+  expect(form.getByRole('button', { name: '+1h' }).disabled).toBe(true)
+})
+
+// Adds an Area through the Areas panel and leaves the panel open.
+function addArea({ name, category = 'projects', status = 'active', hours = '0' }) {
+  if (!screen.queryByRole('region', { name: 'Areas' })) {
+    fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+  }
+  const panel = within(screen.getByRole('region', { name: 'Areas' }))
+  fireEvent.change(panel.getByLabelText('New Area name'), { target: { value: name } })
+  fireEvent.change(panel.getAllByLabelText('Area category').at(-1), { target: { value: category } })
+  fireEvent.change(panel.getAllByLabelText('Status').at(-1), { target: { value: status } })
+  fireEvent.change(panel.getAllByLabelText('Hours per month').at(-1), { target: { value: hours } })
+  fireEvent.click(panel.getByRole('button', { name: 'Add Area' }))
+  return panel
+}
+
+test('an Area can be added, and is remembered after a reload', () => {
+  render(<App />)
+  const panel = addArea({ name: 'Räckvidd (NAVET)', hours: '20' })
+
+  expect(panel.getByText('Räckvidd (NAVET)')).toBeTruthy()
+  expect(panel.getByText(/Active · 20h\/month · last worked never/)).toBeTruthy()
+
+  cleanup()
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+
+  expect(screen.getByText('Räckvidd (NAVET)')).toBeTruthy()
+})
+
+test('an Area needs a name, and the budget cannot be negative', () => {
+  render(<App />)
+  const panel = addArea({ name: '   ' })
+  expect(panel.getByRole('alert').textContent).toBe('Add a name first.')
+
+  addArea({ name: 'Swedish', hours: '-3' })
+  expect(panel.getByRole('alert').textContent).toBe('Hours per month must be 0 or more.')
+  // Neither attempt made an Area.
+  expect(panel.queryByLabelText('Edit Swedish')).toBeNull()
+})
+
+test('an Area can be edited', () => {
+  render(<App />)
+  const panel = addArea({ name: 'Swedish', category: 'learning' })
+
+  fireEvent.click(panel.getByLabelText('Edit Swedish'))
+  fireEvent.change(panel.getByLabelText('Name of Swedish'), { target: { value: 'Swedish B1' } })
+  fireEvent.change(panel.getAllByLabelText('Status')[0], { target: { value: 'maintain' } })
+  fireEvent.click(panel.getByRole('button', { name: 'Save' }))
+
+  expect(panel.getByText('Swedish B1')).toBeTruthy()
+  expect(panel.getByText(/Maintain · 0h\/month/)).toBeTruthy()
+})
+
+test('an unused Area is deleted straight away', () => {
+  render(<App />)
+  const panel = addArea({ name: 'Gesture bloom' })
+
+  fireEvent.click(panel.getByLabelText('Delete Gesture bloom'))
+
+  expect(panel.queryByText('Gesture bloom')).toBeNull()
+})
+
+test('picking an Area in the form sets the task\'s category and shows on the row', () => {
+  render(<App />)
+  addArea({ name: 'Räckvidd', category: 'projects' })
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' })) // close the panel
+
+  // Added from Personal, but the Area lives in Projects.
+  const form = startAdding('Personal', 'Touch screen test')
+  fireEvent.change(form.getByLabelText('Area'), {
+    target: { value: within(form.getByLabelText('Area')).getByText('Räckvidd').value },
+  })
+  submitAndClose(form, 'Personal')
+
+  expect(within(section('Personal')).queryByText('Touch screen test')).toBeNull()
+  const projects = within(section('Projects'))
+  expect(projects.getByText('Touch screen test')).toBeTruthy()
+  expect(projects.getByText(/· Räckvidd/)).toBeTruthy()
+})
+
+test('deleting an Area with tasks asks first, then archives it and keeps the name', () => {
+  render(<App />)
+  addArea({ name: 'Räckvidd', category: 'projects' })
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+
+  const form = startAdding('Projects', 'Touch screen test')
+  fireEvent.change(form.getByLabelText('Area'), {
+    target: { value: within(form.getByLabelText('Area')).getByText('Räckvidd').value },
+  })
+  submitAndClose(form, 'Projects')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+  const panel = within(screen.getByRole('region', { name: 'Areas' }))
+
+  // Step one: asks.
+  fireEvent.click(panel.getByLabelText('Delete Räckvidd'))
+  expect(panel.getByText(/still has 1 task. Archive it\?/)).toBeTruthy()
+
+  // "Keep" backs out.
+  fireEvent.click(panel.getByRole('button', { name: 'Keep' }))
+  expect(panel.getByLabelText('Edit Räckvidd')).toBeTruthy()
+
+  // Step two: archives.
+  fireEvent.click(panel.getByLabelText('Delete Räckvidd'))
+  fireEvent.click(panel.getByRole('button', { name: 'Archive' }))
+
+  expect(panel.getByText('Archived')).toBeTruthy()
+  expect(panel.getByLabelText('Restore Räckvidd')).toBeTruthy()
+
+  // The task keeps its Area's name, greyed out.
+  const areaName = within(section('Projects')).getByText(/· Räckvidd/)
+  expect(areaName.className).toContain('archived')
+})
+
+test('more active Areas than the limit is a warning, not a block', () => {
+  render(<App />)
+  for (const name of ['A1', 'A2', 'A3', 'A4', 'A5']) addArea({ name: name })
+  expect(screen.queryByText(/more than your limit/)).toBeNull()
+
+  addArea({ name: 'A6' })
+  expect(screen.getByText(/6 active Areas, more than your limit of 5/)).toBeTruthy()
+  expect(screen.getByText('A6')).toBeTruthy()
+})
+
+test('settings are saved', () => {
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+  fireEvent.change(screen.getByLabelText('Free hours, weekdays'), { target: { value: '6.5' } })
+  fireEvent.change(screen.getByLabelText('Active Area limit'), { target: { value: '4' } })
+
+  cleanup()
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+
+  expect(screen.getByLabelText('Free hours, weekdays').value).toBe('6.5')
+  expect(screen.getByLabelText('Active Area limit').value).toBe('4')
+})
+
+test('ticking a task notes when it was done, and unticking clears it', () => {
+  render(<App />)
+  addTo('Chores', { title: 'Laundry', time: '10:00' })
+
+  fireEvent.click(within(section('Chores')).getByRole('checkbox'))
+  const saved = () => JSON.parse(localStorage.getItem('dagen.tasks.v1'))[0]
+  expect(saved().doneAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+
+  fireEvent.click(within(section('Chores')).getByRole('checkbox'))
+  expect(saved().doneAt).toBeNull()
+})

@@ -11,7 +11,12 @@ import { splitStart, toMinutes } from './dates.js'
 // Two tasks overlap when EACH ONE STARTS BEFORE THE OTHER ENDS.
 // Back-to-back is fine: 10:00-11:00 and 11:00-12:00 don't overlap,
 // because the second starts exactly when the first ends.
+//
+// Only timed tasks can clash. A task placed "any time" on a day, or not
+// placed at all, has no hours to overlap with (start is null).
 export function overlaps(a, b) {
+  if (!a.start || !b.start) return false
+
   const first = splitStart(a.start)
   const second = splitStart(b.start)
 

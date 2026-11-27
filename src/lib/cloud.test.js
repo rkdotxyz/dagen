@@ -8,12 +8,32 @@
 
 import { describe, expect, test, vi } from 'vitest'
 import { fromPlanner, loadPlanner, savePlanner, toPlanner } from './cloud.js'
+import { DEFAULT_SETTINGS, TASK_DEFAULTS, migrateArea } from './migrate.js'
 
+// A complete planner as Phase 11 saves it. Its task and Area already
+// have every field, so loading it back gives exactly the same thing.
 const planner = {
-  tasks: [{ id: 't1', title: 'Laundry' }],
+  tasks: [
+    {
+      ...TASK_DEFAULTS,
+      id: 't1',
+      title: 'Laundry',
+      categoryId: 'chores',
+      start: '2026-10-05T14:00',
+      day: '2026-10-05',
+      durationMin: 90,
+      tentative: false,
+      status: 'todo',
+    },
+  ],
   templates: [{ id: 'c1', title: 'Cook dinner' }],
   skipped: ['c1:2026-10-05'],
   collapsed: ['social'],
+  areas: [migrateArea({ id: 'a_rk', name: 'Räckvidd', categoryId: 'projects' })],
+  entries: [],
+  activeTimer: null,
+  away: [],
+  settings: DEFAULT_SETTINGS,
 }
 
 // A stand-in for Supabase's client. Its methods return itself so calls
@@ -37,30 +57,88 @@ function fakeClient({ row = null, error = null } = {}) {
 }
 
 describe('planner shape', () => {
-  test('keeps the four lists and nothing else', () => {
+  // Changed in Phase 11 (on purpose): five new fields travel too.
+  test('keeps the planner fields and nothing else', () => {
     const extra = { ...planner, somethingElse: 'should not travel' }
     expect(Object.keys(toPlanner(extra)).sort()).toEqual([
+      'activeTimer',
+      'areas',
+      'away',
       'collapsed',
+      'entries',
+      'settings',
       'skipped',
       'tasks',
       'templates',
     ])
   })
 
-  test('turns anything missing into an empty list', () => {
-    expect(fromPlanner({ tasks: [{ id: 't1' }] })).toEqual({
-      tasks: [{ id: 't1' }],
-      templates: [],
-      skipped: [],
-      collapsed: [],
-    })
-
+  // Changed in Phase 11 (on purpose): missing fields get their defaults,
+  // not only empty lists.
+  test('gives anything missing a safe default', () => {
     expect(fromPlanner(null)).toEqual({
       tasks: [],
       templates: [],
       skipped: [],
       collapsed: [],
+      areas: [],
+      entries: [],
+      activeTimer: null,
+      away: [],
+      settings: DEFAULT_SETTINGS,
     })
+  })
+
+  test('a row saved before Phase 11 loads with nothing lost', () => {
+    // Exactly what Phase 10 wrote: four lists, tasks without the new fields.
+    const oldRow = {
+      tasks: [
+        {
+          id: 't1',
+          title: 'Laundry',
+          categoryId: 'chores',
+          start: '2026-10-05T14:00',
+          durationMin: 90,
+          tentative: false,
+          status: 'done',
+          templateId: 'c1',
+        },
+      ],
+      templates: [{ id: 'c1', title: 'Laundry' }],
+      skipped: ['c1:2026-10-04'],
+      collapsed: ['social'],
+    }
+
+    const loaded = fromPlanner(oldRow)
+
+    // Every old field is still there, untouched...
+    expect(loaded.tasks[0]).toMatchObject(oldRow.tasks[0])
+    // ...and the new ones have their defaults, with day read from start.
+    expect(loaded.tasks[0]).toMatchObject({
+      day: '2026-10-05',
+      areaId: null,
+      fixed: false,
+      due: null,
+      priority: false,
+      rolled: 0,
+      doneAt: null,
+    })
+    expect(loaded.templates).toEqual(oldRow.templates)
+    expect(loaded.skipped).toEqual(oldRow.skipped)
+    expect(loaded.collapsed).toEqual(oldRow.collapsed)
+    expect(loaded.areas).toEqual([])
+    expect(loaded.settings).toEqual(DEFAULT_SETTINGS)
+  })
+
+  test('an unplaced task in the cloud stays unplaced', () => {
+    const row = { tasks: [{ id: 't2', title: 'CV', start: null, day: null }] }
+    expect(fromPlanner(row).tasks[0]).toMatchObject({ start: null, day: null })
+  })
+
+  test('a damaged timer or settings value falls back to the default', () => {
+    const loaded = fromPlanner({ activeTimer: 'oops', settings: { capacity: 'x' } })
+    expect(loaded.activeTimer).toBeNull()
+    expect(loaded.settings).toEqual(DEFAULT_SETTINGS)
   })
 })
 
@@ -69,7 +147,7 @@ describe('loadPlanner', () => {
     expect(await loadPlanner(fakeClient(), 'user-1')).toBeNull()
   })
 
-  test('returns the four lists when a row exists', async () => {
+  test('returns the planner when a row exists', async () => {
     const client = fakeClient({ row: { data: planner } })
     expect(await loadPlanner(client, 'user-1')).toEqual(planner)
   })

@@ -85,3 +85,38 @@ describe('missingTasks', () => {
     expect(missingTasks([cook], monday, moved, [])).toEqual([])
   })
 })
+
+describe('Phase 11 fields on chore copies', () => {
+  test('a copy is a complete task, placed on its day', () => {
+    const [made] = missingTasks([cook], monday, [], [])
+    expect(made).toMatchObject({
+      day: monday,
+      start: `${monday}T18:00`,
+      areaId: null,
+      fixed: false,
+      due: null,
+      priority: false,
+      rolled: 0,
+      doneAt: null,
+    })
+  })
+
+  test('a rule can carry an Area and be fixed', () => {
+    const lecture = { ...cook, id: 'lec', areaId: 'a_kth', fixed: true }
+    expect(missingTasks([lecture], monday, [], [])[0]).toMatchObject({
+      areaId: 'a_kth',
+      fixed: true,
+    })
+  })
+
+  test('a copy you unplaced still counts as made, so no second one appears', () => {
+    // Its start is gone but it remembers its day, and nothing crashes.
+    const unplacedCopy = { id: 'x', templateId: 'cook', start: null, day: monday }
+    expect(missingTasks([cook], monday, [unplacedCopy], [])).toEqual([])
+  })
+
+  test('an unplaced task with no day at all is skipped safely', () => {
+    const loose = { id: 'y', templateId: 'cook', start: null, day: null }
+    expect(missingTasks([cook], monday, [loose], [])).toHaveLength(1)
+  })
+})
