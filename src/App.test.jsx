@@ -740,7 +740,9 @@ test('the tabs switch between Day and Week, and the others are coming soon', () 
   openTab('Week')
   expect(weekScreen().getByText(new RegExp(`^Week ${isoWeek(today)} has`))).toBeTruthy()
   expect(window.location.hash).toBe('#week')
-  expect(screen.getByRole('button', { name: 'Month (coming soon)' }).disabled).toBe(true)
+  // Changed in Phase 14 (on purpose): Month is ready, so Quarter is now
+  // the first one still to come.
+  expect(screen.getByRole('button', { name: 'Quarter (coming soon)' }).disabled).toBe(true)
 
   openTab('Day')
   expect(screen.queryByRole('region', { name: 'Week' })).toBeNull()
@@ -1135,4 +1137,103 @@ test('an entry can be edited, and deleted with Undo', () => {
 
   fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
   expect(timeLog().getByText('Reading')).toBeTruthy()
+})
+
+// ---- Phase 14: the Month screen and budgets ----
+
+function monthScreen() {
+  return within(screen.getByRole('region', { name: 'Month' }))
+}
+
+function seedAreas(areas) {
+  localStorage.setItem(
+    'dagen.areas.v1',
+    JSON.stringify(
+      areas.map((area) => ({
+        categoryId: 'projects',
+        status: 'active',
+        monthlyBudgetHours: 0,
+        outcome: '',
+        startDay: null,
+        endDay: null,
+        createdAt: null,
+        archived: false,
+        ...area,
+      })),
+    ),
+  )
+}
+
+test('the Month screen states how much of the month is free', () => {
+  render(<App />)
+  openTab('Month')
+
+  expect(monthScreen().getByRole('heading', { name: /^\w+ has \d+h free$/ })).toBeTruthy()
+  expect(monthScreen().getByText(/0h planned · 0 deadlines · 0h tracked/)).toBeTruthy()
+  expect(window.location.hash).toBe('#month')
+})
+
+test('a deadline shows on its day in the calendar, and tapping opens the day', () => {
+  const due = addDays(today, 3)
+  seed([{ id: 'a', title: 'Essay', due: due }])
+  render(<App />)
+  openTab('Month')
+
+  // The cell may be in this month or the next, so move there if needed.
+  if (due.slice(0, 7) !== today.slice(0, 7)) {
+    fireEvent.click(monthScreen().getByLabelText('Next month'))
+  }
+
+  const cell = monthScreen().getByRole('button', { name: new RegExp(`^${formatShortDay(due)}, Due: Essay`) })
+  expect(within(cell).getByText('Due: Essay')).toBeTruthy()
+
+  fireEvent.click(cell)
+  expect(screen.queryByRole('region', { name: 'Month' })).toBeNull()
+  // The header now names that day.
+  expect(screen.getByText(formatDay(due), { selector: '.today' })).toBeTruthy()
+})
+
+test('weekly chores are not written into the cells', () => {
+  render(<App />)
+  addChore({ title: 'Cook dinner', time: '18:00' })
+  openTab('Month')
+
+  expect(monthScreen().queryByText('Cook dinner')).toBeNull()
+  expect(monthScreen().getByText(/left out of the days/)).toBeTruthy()
+})
+
+test('budgets move an hour at a time and say whether they fit', () => {
+  seedAreas([
+    { id: 'a_rk', name: 'Räckvidd', monthlyBudgetHours: 20 },
+    { id: 'a_gb', name: 'Gesture bloom', status: 'paused', monthlyBudgetHours: 10 },
+  ])
+  render(<App />)
+  openTab('Month')
+  const budgets = within(screen.getByRole('region', { name: 'Monthly budgets' }))
+
+  // Paused Areas have no row.
+  expect(budgets.queryByText('Gesture bloom')).toBeNull()
+  expect(budgets.getByText('20h')).toBeTruthy()
+  expect(budgets.getByText(/h unbudgeted\. Keep some slack\./)).toBeTruthy()
+
+  fireEvent.click(budgets.getByLabelText('More time for Räckvidd'))
+  expect(budgets.getByText('21h')).toBeTruthy()
+  fireEvent.click(budgets.getByLabelText('Less time for Räckvidd'))
+  fireEvent.click(budgets.getByLabelText('Less time for Räckvidd'))
+  expect(budgets.getByText('19h')).toBeTruthy()
+
+  // Saved with the Area.
+  expect(JSON.parse(localStorage.getItem('dagen.areas.v1'))[0].monthlyBudgetHours).toBe(19)
+})
+
+test('budgets bigger than the month say by how much', () => {
+  seedAreas([{ id: 'a_big', name: 'Everything', monthlyBudgetHours: 400 }])
+  render(<App />)
+  openTab('Month')
+
+  expect(
+    within(screen.getByRole('region', { name: 'Monthly budgets' })).getByText(
+      /^Over by \d+h\. Lower a budget or pause an Area\.$/,
+    ),
+  ).toBeTruthy()
 })

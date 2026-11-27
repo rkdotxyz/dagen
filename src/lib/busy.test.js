@@ -19,8 +19,16 @@ describe('toBusyBlocks', () => {
         durationMin: 120,
         status: 'todo',
         external: true,
+        recurring: false,
       },
     ])
+  })
+
+  // Phase 14: the Month view leaves repeating events out of its labels.
+  test('knows a copy of a repeating event from a one-off', () => {
+    const weekly = { ...lecture, recurringEventId: 'series-1' }
+    expect(toBusyBlocks([weekly])[0].recurring).toBe(true)
+    expect(toBusyBlocks([lecture])[0].recurring).toBe(false)
   })
 
   test("skips Dagen's own events", () => {

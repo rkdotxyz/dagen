@@ -60,3 +60,17 @@ export function missingTasks(templates, day, tasks, skipped) {
       status: 'todo',
     }))
 }
+
+// Phase 14: the chores that WOULD exist on these days, without making
+// them. The Month screen needs a month of weekly lectures to count fixed
+// hours, but saving 30 days of copies would also send them all to Google
+// Calendar. These previews have ids starting "preview:", are never saved,
+// and are only used for sums and labels.
+export function previewChores(templates, days, tasks, skipped) {
+  return days.flatMap((day) =>
+    missingTasks(templates, day, tasks, skipped).map((task) => ({
+      ...task,
+      id: `preview:${task.templateId}:${day}`,
+    })),
+  )
+}

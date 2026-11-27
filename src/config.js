@@ -60,7 +60,7 @@ export const MAX_PRIORITIES = 5
 export const TABS = [
   { id: 'day', name: 'Day', ready: true },
   { id: 'week', name: 'Week', ready: true },
-  { id: 'month', name: 'Month', ready: false },
+  { id: 'month', name: 'Month', ready: true },
   { id: 'quarter', name: 'Quarter', ready: false },
   { id: 'insights', name: 'Insights', ready: false },
 ]

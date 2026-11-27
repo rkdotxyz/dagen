@@ -3,7 +3,7 @@
 
 *Dagen* is Swedish for "the day". A phone-friendly planner: tasks live in colour-coded categories and Areas, timed tasks appear in Google Calendar, and tasks without a day wait in a "To place" list.
 
-**Status:** v2 is done (Phases 0–10). Now building **Dagen Horizon** (v3.0): planning across the day, week, month and quarter, and tracking where time goes. Phase 13 of 17: one timer, and a log of where the time went. The full plan is in `docs/horizon-spec.md`.
+**Status:** v2 is done (Phases 0–10). Now building **Dagen Horizon** (v3.0): planning across the day, week, month and quarter, and tracking where time goes. Phase 14 of 17: the Month view, and monthly hour budgets per Area. The full plan is in `docs/horizon-spec.md`.
 
 ## Run it locally
 
@@ -32,7 +32,7 @@ Then open http://localhost:5173
 - [x] Phase 11: Data model, Areas, unplaced tasks (v2.1)
 - [x] Phase 12: Week view, To place, rollover, deadlines (v2.2)
 - [x] Phase 13: Timer and time log (v2.3)
-- [ ] Phase 14: Month view and budgets (v2.4)
+- [x] Phase 14: Month view and budgets (v2.4)
 - [ ] Phase 15: Quarter view and away blocks (v2.5)
 - [ ] Phase 16: Insights (v2.6)
 - [ ] Phase 17: Polish and release (v3.0)

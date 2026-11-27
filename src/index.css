@@ -1044,4 +1044,202 @@
   .time-log .category-header {
     justify-content: space-between;
   }
+
+  /* ---------- Phase 14: the Month screen ---------- */
+
+  .month-main {
+    min-width: 0;
+  }
+
+  /* Seven equal columns; the first row is the weekday letters. */
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+
+  .month-weekday {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    padding-bottom: 0.25rem;
+  }
+
+  .month-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.15rem;
+    min-width: 0;
+    min-height: 3.25rem;
+    padding: 0.3rem;
+    font: inherit;
+    text-align: left;
+    color: var(--foreground);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  .month-cell:hover {
+    background: var(--accent);
+  }
+
+  /* Days of the months either side: there, but quiet. */
+  .month-cell.outside {
+    opacity: 0.45;
+  }
+
+  .month-cell.today .month-date {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .month-cell.over {
+    border-color: var(--warn);
+    box-shadow: inset 3px 0 0 var(--warn);
+  }
+
+  .month-cell.away {
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--muted) 0 6px,
+      transparent 6px 12px
+    );
+  }
+
+  .month-date {
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One line each, cut short with "…" when there's no room. */
+  .cell-label,
+  .cell-more {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.65rem;
+    line-height: 1.3;
+    border-radius: 3px;
+    padding: 0 0.2rem;
+  }
+
+  .cell-label {
+    background: var(--muted);
+  }
+
+  .cell-label.cell-due {
+    color: var(--warn);
+  }
+
+  .cell-label.cell-fixed {
+    border-left: 2px solid var(--foreground);
+  }
+
+  .cell-more {
+    color: var(--muted-foreground);
+  }
+
+  /* On a computer the cells have room to breathe. */
+  @media (min-width: 900px) {
+    .month-cell {
+      min-height: 5.5rem;
+      padding: 0.4rem;
+    }
+
+    .cell-label,
+    .cell-more {
+      font-size: 0.75rem;
+    }
+  }
+
+  .caption {
+    margin: 0.6rem 0 0;
+    color: var(--muted-foreground);
+    font-size: 0.8rem;
+  }
+
+  .month-label {
+    align-self: center;
+    font-weight: 500;
+    padding: 0 0.25rem;
+  }
+
+  /* ---------- Budgets ---------- */
+
+  .budget-list {
+    list-style: none;
+    margin: 0 0 0.75rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .budget-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .budget-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+  }
+
+  .budget-hours {
+    min-width: 2.75rem;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  /* The budgets as a filled bar; the thin mark is where the room ends. */
+  .budget-bar {
+    position: relative;
+    height: 0.75rem;
+    border-radius: 999px;
+    background: var(--muted);
+    overflow: visible;
+  }
+
+  .budget-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--primary);
+  }
+
+  .budget-bar.over .budget-fill {
+    background: var(--warn);
+  }
+
+  .budget-room {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    background: var(--foreground);
+  }
+
+  .budget-message {
+    margin: 0.4rem 0 0;
+    font-size: 0.875rem;
+  }
 }
+

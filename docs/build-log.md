@@ -228,3 +228,30 @@
 - [x] Log as planned is only offered once
 - [x] `npm run check` passes: 290 tests
 - [ ] Merged via PR, tagged v2.3
+
+
+## Phase 14: Month view and budgets (v2.4)
+
+**Date:** 2026-11-27
+
+**What I did**
+- `month.js`: the calendar grid (whole Monday-first weeks), each day's labels (deadlines, one-off fixed events, priorities, two at most plus "+N more"), the headline and sub-line, and the budget check
+- The Month tab: "December has 112h free" or "3 overpacked days in December", with planned hours · deadlines · tracked hours. Tapping a day opens it on the Day screen
+- Away days are hatched, overpacked days get an amber edge, and a caption explains why weekly things aren't in the cells
+- Monthly budgets: one row per Area that isn't paused, − / + an hour at a time, and a bar of all budgets against the month's hours after fixed time, saying "Over by 12h…" or "8h unbudgeted…"
+- Busy calendars fetched for every week the month touches (same cache as the Week screen). Repeating Google events are marked, so a weekly seminar stays out of the cell labels
+- `previewChores`: weekly chores and lectures count in the month's hours WITHOUT being saved, so viewing a month never sends 30 days of copies to Google Calendar
+
+**What broke and how I fixed it**
+- (fill in)
+- The headline said 112h free but the budgets said 108h: lectures on away days were subtracted from a month total that already gave those days zero. The budget room is now added up day by day, never below zero
+- A "Final crit" label spilled over its date: its class was `fixed` again, which is Tailwind's `position: fixed`. Renamed to `cell-fixed`
+
+**Learned**
+- (fill in)
+
+**Checklist**
+- [x] Month free hours, budget totals and the over/under message are tested
+- [x] Deadline labels land on the right day
+- [x] `npm run check` passes: 312 tests
+- [ ] Merged via PR, tagged v2.4
