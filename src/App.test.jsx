@@ -23,8 +23,11 @@ import {
   addDays,
   formatDay,
   formatDuration,
+  formatShortDay,
+  isoWeek,
   todayISO,
   weekDays,
+  weekdayName,
 } from './lib/dates.js'
 
 beforeEach(() => {
@@ -33,6 +36,9 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  // The screen is kept in the address (#week). jsdom keeps one address
+  // for the whole file, so put it back for the next test.
+  window.history.replaceState(null, '', '/')
 })
 
 function section(name) {
@@ -687,4 +693,276 @@ test('ticking a task notes when it was done, and unticking clears it', () => {
 
   fireEvent.click(within(section('Chores')).getByRole('checkbox'))
   expect(saved().doneAt).toBeNull()
+})
+
+// ---- Phase 12: tabs, Week, rollover, To place ----
+
+// Puts tasks straight into storage, as if saved earlier, with every
+// Phase 11 field filled in.
+function seed(tasks) {
+  localStorage.setItem(
+    'dagen.tasks.v1',
+    JSON.stringify(
+      tasks.map((task) => ({
+        categoryId: 'personal',
+        status: 'todo',
+        durationMin: 60,
+        tentative: false,
+        start: null,
+        day: null,
+        areaId: null,
+        fixed: false,
+        due: null,
+        priority: false,
+        rolled: 0,
+        doneAt: null,
+        ...task,
+      })),
+    ),
+  )
+}
+
+function openTab(name) {
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Views' })).getByRole('button', { name: name }))
+}
+
+function weekScreen() {
+  return within(screen.getByRole('region', { name: 'Week' }))
+}
+
+const today = todayISO()
+const yesterday = addDays(today, -1)
+
+test('the tabs switch between Day and Week, and the others are coming soon', () => {
+  render(<App />)
+  expect(screen.queryByRole('region', { name: 'Week' })).toBeNull()
+
+  openTab('Week')
+  expect(weekScreen().getByText(new RegExp(`^Week ${isoWeek(today)} has`))).toBeTruthy()
+  expect(window.location.hash).toBe('#week')
+  expect(screen.getByRole('button', { name: 'Month (coming soon)' }).disabled).toBe(true)
+
+  openTab('Day')
+  expect(screen.queryByRole('region', { name: 'Week' })).toBeNull()
+})
+
+test('the app reopens on the screen in the address', () => {
+  window.history.replaceState(null, '', '/#week')
+  render(<App />)
+  expect(screen.getByRole('region', { name: 'Week' })).toBeTruthy()
+})
+
+test('the Day screen states how much of the day is free', () => {
+  // Weekdays have 8h, weekends 4h (the default settings).
+  seed([{ id: 'a', title: 'Essay', day: today, durationMin: 90 }])
+  render(<App />)
+
+  const weekend = ['Saturday', 'Sunday'].includes(weekdayName(today))
+  const free = weekend ? '2.5h' : '6.5h'
+  expect(screen.getByRole('heading', { name: `${weekdayName(today)} · ${free} free` })).toBeTruthy()
+  expect(screen.getByText(new RegExp(`0h fixed · 1.5h planned · ${free} free`))).toBeTruthy()
+})
+
+test('an overpacked day says so, counting fixed events', () => {
+  seed([
+    { id: 'f', title: 'Crit', fixed: true, start: `${today}T09:00`, durationMin: 120 },
+    { id: 'a', title: 'Model', day: today, durationMin: 600 },
+  ])
+  render(<App />)
+
+  // 2h fixed + 10h planned is over by 4h on a weekday, 8h at a weekend.
+  const weekend = ['Saturday', 'Sunday'].includes(weekdayName(today))
+  expect(
+    screen.getByRole('heading', {
+      name: `${weekdayName(today)} is overpacked by ${weekend ? '8h' : '4h'}`,
+    }),
+  ).toBeTruthy()
+
+  openTab('Week')
+  expect(weekScreen().getByRole('heading', { name: `${weekdayName(today)} is overpacked` })).toBeTruthy()
+})
+
+test('the Week screen shows each day\'s tasks, fixed ones marked', () => {
+  seed([
+    { id: 'f', title: 'Crit', fixed: true, start: `${today}T13:00`, durationMin: 60 },
+    { id: 'a', title: 'Read', day: today },
+  ])
+  render(<App />)
+  openTab('Week')
+
+  const day = within(weekScreen().getByRole('region', { name: formatShortDay(today) }))
+  expect(day.getByText('Crit')).toBeTruthy()
+  expect(day.getByRole('img', { name: 'Fixed' })).toBeTruthy()
+  expect(day.getByText(/any time · 1h/)).toBeTruthy()
+})
+
+test('a task can be edited from the Week screen', () => {
+  seed([{ id: 'a', title: 'Read', day: today }])
+  render(<App />)
+  openTab('Week')
+
+  const day = within(weekScreen().getByRole('region', { name: formatShortDay(today) }))
+  fireEvent.click(day.getByLabelText('Edit Read'))
+  fireEvent.change(day.getByLabelText('Edit Read', { selector: 'input' }), {
+    target: { value: 'Read chapter 3' },
+  })
+  fireEvent.click(day.getByRole('button', { name: 'Save' }))
+
+  expect(day.getByText('Read chapter 3')).toBeTruthy()
+})
+
+test('the arrows move the Week screen a week at a time', () => {
+  render(<App />)
+  openTab('Week')
+  fireEvent.click(weekScreen().getByLabelText('Next week'))
+  expect(weekScreen().getByText(new RegExp(`^Week ${isoWeek(addDays(today, 7))} has`))).toBeTruthy()
+  fireEvent.click(weekScreen().getByLabelText('Go to this week'))
+  expect(weekScreen().getByText(new RegExp(`^Week ${isoWeek(today)} has`))).toBeTruthy()
+})
+
+test('priorities this week are listed', () => {
+  seed([
+    { id: 'p', title: 'Portfolio draft', priority: true, day: today },
+    { id: 'n', title: 'Not a priority', day: today },
+  ])
+  render(<App />)
+  openTab('Week')
+
+  const priorities = within(screen.getByRole('region', { name: 'Priorities this week' }))
+  expect(priorities.getByText('Portfolio draft')).toBeTruthy()
+  expect(priorities.queryByText('Not a priority')).toBeNull()
+})
+
+test('unfinished work from yesterday is offered back, and moves on a yes', () => {
+  seed([{ id: 'a', title: 'Write report', day: yesterday }])
+  render(<App />)
+
+  expect(screen.getByText(/1 task didn’t happen\. Move them to To place\?/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Move them' }))
+
+  expect(screen.queryByText(/didn’t happen/)).toBeNull()
+  expect(toPlace().getByText('Write report')).toBeTruthy()
+  expect(toPlace().getByText('pushed 1×')).toBeTruthy()
+})
+
+test('"Not now" leaves the tasks alone and is not asked again today', () => {
+  seed([{ id: 'a', title: 'Write report', day: yesterday }])
+  render(<App />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+  expect(screen.queryByText(/didn’t happen/)).toBeNull()
+  expect(toPlace().queryByText('Write report')).toBeNull()
+
+  cleanup()
+  render(<App />)
+  expect(screen.queryByText(/didn’t happen/)).toBeNull()
+})
+
+test('fixed, done and recurring tasks are never offered for rollover', () => {
+  seed([
+    { id: 'f', title: 'Lecture', fixed: true, start: `${yesterday}T10:00` },
+    { id: 'd', title: 'Done', day: yesterday, status: 'done' },
+    { id: 'c', title: 'Cook', day: yesterday, templateId: 'cook' },
+  ])
+  render(<App />)
+  expect(screen.queryByText(/didn’t happen/)).toBeNull()
+})
+
+test('with rollover switched off, nothing is asked', () => {
+  seed([{ id: 'a', title: 'Write report', day: yesterday }])
+  localStorage.setItem(
+    'dagen.settings.v1',
+    JSON.stringify({ capacity: { weekday: 8, weekend: 4 }, activeAreaLimit: 5, rolloverEnabled: false }),
+  )
+  render(<App />)
+  expect(screen.queryByText(/didn’t happen/)).toBeNull()
+})
+
+test('"Place on…" puts a task on a day, any time', () => {
+  seed([{ id: 'a', title: 'Update CV' }])
+  render(<App />)
+
+  fireEvent.change(toPlace().getByLabelText('Place Update CV on a day'), { target: { value: today } })
+
+  expect(toPlace().queryByText('Update CV')).toBeNull()
+  expect(within(section('Personal')).getByText(/Any time · 1h/)).toBeTruthy()
+})
+
+test('To place shows when to start, earliest first', () => {
+  seed([
+    { id: 'later', title: 'Later', due: addDays(today, 20) },
+    { id: 'soon', title: 'Soon', due: addDays(today, 1) },
+  ])
+  render(<App />)
+
+  const titles = toPlace().getAllByText(/^(Later|Soon)$/).map((node) => node.textContent)
+  expect(titles).toEqual(['Soon', 'Later'])
+  expect(toPlace().getByText('start now')).toBeTruthy()
+  expect(toPlace().getByText(`start by ${formatShortDay(addDays(today, 18))}`)).toBeTruthy()
+})
+
+test('a task pushed 3 times can be halved', () => {
+  seed([{ id: 'a', title: 'Big essay', durationMin: 240, rolled: 3 }])
+  render(<App />)
+
+  fireEvent.click(toPlace().getByRole('button', { name: 'Halve it' }))
+
+  expect(toPlace().getByText(/Not placed · 2h$/)).toBeTruthy()
+  expect(toPlace().queryByText(/pushed/)).toBeNull()
+  expect(toPlace().queryByRole('button', { name: 'Halve it' })).toBeNull()
+})
+
+test('a task pushed 3 times can be dropped, and Undo brings it back', () => {
+  seed([{ id: 'a', title: 'Big essay', rolled: 3 }])
+  render(<App />)
+
+  fireEvent.click(toPlace().getByRole('button', { name: 'Drop' }))
+  expect(toPlace().queryByText('Big essay')).toBeNull()
+  expect(screen.getByText('Dropped Big essay.')).toBeTruthy()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(toPlace().getByText('Big essay')).toBeTruthy()
+  expect(screen.queryByText('Dropped Big essay.')).toBeNull()
+})
+
+test('the form explains what is missing instead of doing nothing', () => {
+  render(<App />)
+  fireEvent.click(screen.getByLabelText('Add to Chores'))
+  const form = within(section('Chores'))
+
+  fireEvent.submit(form.getByLabelText('New task in Chores').closest('form'))
+  expect(form.getByRole('alert').textContent).toBe('Add a title first.')
+})
+
+test('a fixed event needs a time, and cannot be parked without a day', () => {
+  render(<App />)
+  const form = startAdding('Classes', 'Crit')
+  fireEvent.click(form.getByRole('button', { name: 'Fixed event' }))
+
+  expect(form.queryByRole('button', { name: 'No day yet' })).toBeNull()
+  expect(form.queryByLabelText('Tentative')).toBeNull()
+
+  fireEvent.change(form.getByLabelText('Start time'), { target: { value: '' } })
+  fireEvent.submit(form.getByLabelText('New task in Classes').closest('form'))
+  expect(form.getByRole('alert').textContent).toBe('Fixed events need a start time.')
+
+  fireEvent.change(form.getByLabelText('Start time'), { target: { value: '13:00' } })
+  fireEvent.submit(form.getByLabelText('New task in Classes').closest('form'))
+  fireEvent.click(form.getByRole('button', { name: 'Done' }))
+
+  expect(within(section('Classes')).getByRole('img', { name: 'Fixed' })).toBeTruthy()
+})
+
+test('a deadline and priority can be set in the form', () => {
+  render(<App />)
+  const form = startAdding('Projects', 'Exhibit text')
+  fireEvent.click(form.getByRole('button', { name: 'No day yet' }))
+  fireEvent.change(form.getByLabelText('Deadline (optional)'), {
+    target: { value: addDays(today, 1) },
+  })
+  fireEvent.click(form.getByLabelText('Priority'))
+  submitAndClose(form, 'Projects')
+
+  expect(toPlace().getByText('start now')).toBeTruthy()
+  expect(toPlace().getByRole('img', { name: 'Priority' })).toBeTruthy()
 })

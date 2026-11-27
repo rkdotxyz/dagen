@@ -9,6 +9,14 @@
   It can also belong to an Area. Picking an Area sets the category too,
   because an Area lives inside one category.
 
+  Since Phase 12 it asks what KIND of thing this is:
+    Task         flexible: can be any time, or not placed yet, and can
+                 have a deadline. Unfinished ones roll over.
+    Fixed event  happens at a set time (a crit, a flight). Needs a day and
+                 a time, takes capacity first, and never rolls over.
+  and whether it's a priority this week. Problems are explained under the
+  form rather than silently ignored.
+
   The fields are shadcn/ui components: Input, NativeSelect (a real
   <select>), Button chips and a Switch for "tentative".
 */
@@ -67,9 +75,14 @@ function TaskForm({
   const [durationMin, setDurationMin] = useState(() => task?.durationMin ?? 30)
   const [tentative, setTentative] = useState(() => task?.tentative ?? false)
   const [areaId, setAreaId] = useState(() => task?.areaId ?? '')
+  const [fixed, setFixed] = useState(() => task?.fixed ?? false)
+  const [due, setDue] = useState(() => task?.due ?? '')
+  const [priority, setPriority] = useState(() => task?.priority ?? false)
+  const [error, setError] = useState(null)
   // A unique id per form, so the "Tentative" label can point at its switch
   // even when several forms are open at once.
   const tentativeId = useId()
+  const priorityId = useId()
 
   const isEditing = Boolean(task)
   // A start only exists when there's both a day and a time.
@@ -92,7 +105,15 @@ function TaskForm({
   function handleSubmit(event) {
     event.preventDefault()
     const trimmed = title.trim()
-    if (trimmed === '') return
+    if (trimmed === '') {
+      setError('Add a title first.')
+      return
+    }
+    if (fixed && !start) {
+      setError('Fixed events need a start time.')
+      return
+    }
+    setError(null)
 
     const area = findArea(areas, areaId)
 
@@ -101,7 +122,12 @@ function TaskForm({
       start: start,
       day: day || null,
       durationMin: durationMin,
-      tentative: tentative,
+      // A fixed event is firm by definition, and deadlines belong to
+      // flexible tasks.
+      tentative: fixed ? false : tentative,
+      fixed: fixed,
+      due: fixed ? null : due || null,
+      priority: priority,
       areaId: area ? area.id : null,
       // The Area decides the category. With no Area, the task stays in
       // the section it was added from.
@@ -141,6 +167,26 @@ function TaskForm({
           aria-label={label}
           autoFocus
         />
+
+        {/* Task or Fixed event: two buttons that work as a choice. */}
+        <div className="chips" role="group" aria-label="Kind">
+          <Button
+            size="sm"
+            variant={fixed ? 'outline' : 'default'}
+            aria-pressed={!fixed}
+            onClick={() => setFixed(false)}
+          >
+            Task
+          </Button>
+          <Button
+            size="sm"
+            variant={fixed ? 'default' : 'outline'}
+            aria-pressed={fixed}
+            onClick={() => setFixed(true)}
+          >
+            Fixed event
+          </Button>
+        </div>
 
         {/* Only shown once you have an Area, so a brand-new planner looks
             exactly as it did before Phase 11. */}
@@ -227,15 +273,32 @@ function TaskForm({
           >
             Tomorrow
           </Button>
-          <Button
-            size="sm"
-            variant={day ? 'outline' : 'default'}
-            aria-pressed={!day}
-            onClick={() => setDay('')}
-          >
-            No day yet
-          </Button>
+          {/* A fixed event always has a day, so it can't be parked. */}
+          {!fixed && (
+            <Button
+              size="sm"
+              variant={day ? 'outline' : 'default'}
+              aria-pressed={!day}
+              onClick={() => setDay('')}
+            >
+              No day yet
+            </Button>
+          )}
         </div>
+
+        {/* Deadlines belong to flexible tasks. The "start by" day is
+            worked out from it and the estimate (deadlines.js). */}
+        {!fixed && (
+          <label className="setting">
+            Deadline (optional)
+            <Input
+              className="field"
+              type="date"
+              value={due}
+              onChange={(event) => setDue(event.target.value)}
+            />
+          </label>
+        )}
 
         <p className="form-summary">
           {summary}
@@ -250,10 +313,27 @@ function TaskForm({
         <div className="form-row">
           {/* A switch, announced as on or off. The label points at it by
               id (htmlFor), so tapping the word works too. */}
+          {!fixed && (
+            <div className="tentative-toggle">
+              <Switch id={tentativeId} checked={tentative} onCheckedChange={setTentative} />
+              <Label htmlFor={tentativeId}>Tentative</Label>
+            </div>
+          )}
+
           <div className="tentative-toggle">
-            <Switch id={tentativeId} checked={tentative} onCheckedChange={setTentative} />
-            <Label htmlFor={tentativeId}>Tentative</Label>
+            <Switch id={priorityId} checked={priority} onCheckedChange={setPriority} />
+            <Label htmlFor={priorityId}>Priority</Label>
           </div>
+        </div>
+
+        {/* role="alert" makes a screen reader read the problem out. */}
+        {error && (
+          <p className="field-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="form-row form-end">
 
           <div className="form-actions">
             <Button type="submit">{isEditing ? 'Save' : 'Add'}</Button>

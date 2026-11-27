@@ -10,6 +10,11 @@
   time entries, running timer and away blocks that later phases fill in.
   A task can now have no day (it waits in To place) or a day with no
   time (any time). Anything that needs a task's day asks placement.js.
+
+  Since Phase 12 there are two screens, Day and Week, chosen by the tab
+  bar and remembered in the address (#week). Each keeps its own place:
+  the Day screen its day, the Week screen its week. App also asks the
+  morning rollover question, and fetches busy calendars a week at a time.
 */
 
 import { useEffect, useRef, useState } from 'react'
@@ -18,13 +23,22 @@ import AccountBar from './components/AccountBar.jsx'
 import AreasPanel from './components/AreasPanel.jsx'
 import CalendarBar from './components/CalendarBar.jsx'
 import CalendarPicker from './components/CalendarPicker.jsx'
+import CapacityBar from './components/CapacityBar.jsx'
 import CategorySection from './components/CategorySection.jsx'
+import RolloverPrompt from './components/RolloverPrompt.jsx'
+import TabBar from './components/TabBar.jsx'
 import TemplatePanel from './components/TemplatePanel.jsx'
 import ToPlaceSection from './components/ToPlaceSection.jsx'
+import UndoToast from './components/UndoToast.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
-import { CATEGORIES, getCategory } from './config.js'
+import WeekView from './components/WeekView.jsx'
+import { CATEGORIES, TABS, getCategory } from './config.js'
 import { createArea, removeArea, updateArea } from './lib/areas.js'
 import { toBusyBlocks } from './lib/busy.js'
+import { createBusyCache, uniqueEvents } from './lib/busyCache.js'
+import { daySummary } from './lib/capacity.js'
+import { dayHeadline, halved, placeOn, toPlaceList } from './lib/planning.js'
+import { rollOver, rolloverCandidates } from './lib/rollover.js'
 import { applyPlan, isEmptyPlan, planSync, signatureOf } from './lib/calendarSync.js'
 import { loadPlanner, savePlanner } from './lib/cloud.js'
 import { conflictsById } from './lib/conflicts.js'
@@ -33,7 +47,7 @@ import {
   deleteEvent,
   listCalendars,
   listChangedEvents,
-  listDayEvents,
+  listRangeEvents,
   updateEvent,
 } from './lib/googleCalendar.js'
 import { applyIncoming } from './lib/incoming.js'
@@ -43,13 +57,14 @@ import {
   addDays,
   formatDay,
   formatMonthLabel,
+  startOfWeek,
   toMinutes,
   toStart,
   todayISO,
   weekDays,
 } from './lib/dates.js'
 import { TASK_DEFAULTS } from './lib/migrate.js'
-import { dayOf, placementOf, timeOf, withDay } from './lib/placement.js'
+import { dayOf, timeOf, withDay } from './lib/placement.js'
 import {
   loadAreas,
   loadAway,
@@ -61,6 +76,10 @@ import {
   saveEntries,
   saveSettings,
   saveTimer,
+  loadRolloverAsked,
+  loadTab,
+  saveRolloverAsked,
+  saveTab,
   loadBusyCalendars,
   loadCollapsed,
   loadSent,
@@ -99,6 +118,25 @@ function fillChores(tasks, day, templates, skipped) {
 
   return [...tasks, ...extra.map((task) => ({ id: makeId(), ...task }))]
 }
+
+// The same for several days at once: the Week screen needs all seven
+// days' chores (and fixed lectures) to add up their hours.
+function fillDays(tasks, days, templates, skipped) {
+  return days.reduce((current, day) => fillChores(current, day, templates, skipped), tasks)
+}
+
+// Which screen to open on: the address says (#week), otherwise the last
+// one you used, otherwise Day. Only screens that exist yet are accepted.
+function initialTab() {
+  const ready = (id) => TABS.some((tab) => tab.id === id && tab.ready)
+  const fromHash = window.location.hash.replace('#', '')
+  if (ready(fromHash)) return fromHash
+  const saved = loadTab()
+  return ready(saved) ? saved : 'day'
+}
+
+// How long the Undo toast stays.
+const UNDO_MS = 6000
 
 // Earliest first. Within a day, timed tasks come in clock order and
 // "any time" ones after them. Tasks with no day at all go last.
@@ -153,7 +191,16 @@ function App() {
   // The day the strip is on. Dagen always opens on today: this is state,
   // not something saved, so closing and reopening comes back to today.
   const [selectedDay, setSelectedDay] = useState(() => todayISO())
-  const [today] = useState(() => todayISO())
+  // Today, checked again whenever you come back to the app, so a tab left
+  // open overnight knows it's a new day (and asks the rollover question).
+  const [today, setToday] = useState(() => todayISO())
+  // Which screen, and where the Week screen is (any day in its week).
+  const [tab, setTab] = useState(() => initialTab())
+  const [weekDay, setWeekDay] = useState(() => todayISO())
+  // The day the rollover question was last answered, and what Undo would
+  // put back: { message, task, index } or null.
+  const [rolloverAsked, setRolloverAsked] = useState(() => loadRolloverAsked())
+  const [undo, setUndo] = useState(null)
   // The recurring chore rules, and the "don't bring this one back" list.
   const [templates, setTemplates] = useState(() => loadTemplates())
   const [skipped, setSkipped] = useState(() => loadSkipped())
@@ -181,6 +228,11 @@ function App() {
   const [activeTimer, setActiveTimer] = useState(() => loadTimer())
   const [away, setAway] = useState(() => loadAway())
   const [showAreas, setShowAreas] = useState(false)
+  // Busy events, kept per calendar and week for as long as the app is
+  // open. useRef keeps the same cache across redraws without causing any.
+  const busyCache = useRef(null)
+  // Bumped when you come back to the app, so busy calendars are re-read.
+  const [busyRefresh, setBusyRefresh] = useState(0)
 
   useEffect(() => {
     saveTasks(tasks)
@@ -225,6 +277,48 @@ function App() {
   useEffect(() => {
     saveAway(away)
   }, [away])
+
+  useEffect(() => {
+    saveTab(tab)
+  }, [tab])
+
+  // Coming back to the app: is it a new day? Did a calendar change?
+  useEffect(() => {
+    function wakeUp() {
+      setToday(todayISO())
+      busyCache.current?.clear()
+      setBusyRefresh((count) => count + 1)
+    }
+
+    window.addEventListener('focus', wakeUp)
+    return () => window.removeEventListener('focus', wakeUp)
+  }, [])
+
+  // The back button changes the address; follow it to that screen.
+  useEffect(() => {
+    function followHash() {
+      const id = window.location.hash.replace('#', '')
+      if (TABS.some((item) => item.id === id && item.ready)) setTab(id)
+    }
+
+    window.addEventListener('hashchange', followHash)
+    return () => window.removeEventListener('hashchange', followHash)
+  }, [])
+
+  // The Week screen adds up all seven days, so their chores (and fixed
+  // lectures made by rules) must exist. fillDays returns the same list
+  // when nothing is missing, so this can't loop.
+  useEffect(() => {
+    if (tab !== 'week') return
+    setTasks((current) => fillDays(current, weekDays(weekDay), templates, skipped))
+  }, [tab, weekDay, templates, skipped])
+
+  // The Undo toast disappears by itself after a few seconds.
+  useEffect(() => {
+    if (!undo) return
+    const timer = setTimeout(() => setUndo(null), UNDO_MS)
+    return () => clearTimeout(timer)
+  }, [undo])
 
   // A mirror of the two lists that incoming changes need. Reading them
   // through a ref means the sync below doesn't have to restart every time
@@ -418,32 +512,42 @@ function App() {
     }
   }, [calendarToken])
 
-  // What else is booked on the day you're looking at. Fetched per day
-  // rather than per week: one day is what the sections show.
+  // What else is booked: lectures, meetings. Since Phase 12 these take
+  // capacity too, and the Week screen shows all seven days, so a whole
+  // week is fetched at a time: the Day screen's week and the Week
+  // screen's week. The cache means moving back and forth asks Google once.
+  const dayWeek = startOfWeek(selectedDay)
+  const shownWeek = startOfWeek(weekDay)
+
   useEffect(() => {
     if (!calendarToken || busyCalendars.length === 0) {
       setBusy([])
       return
     }
 
+    // A new token (a new sign-in) starts a fresh cache.
+    if (!busyCache.current || busyCache.current.token !== calendarToken) {
+      busyCache.current = createBusyCache((calendarId, from, until) =>
+        listRangeEvents(calendarToken, calendarId, from, until),
+      )
+      busyCache.current.token = calendarToken
+    }
+
     let active = true
+    const weeks = dayWeek === shownWeek ? [dayWeek] : [dayWeek, shownWeek]
 
     Promise.all(
-      busyCalendars.map((calendarId) =>
-        listDayEvents(calendarToken, calendarId, selectedDay).catch((error) => {
-          console.error('Could not read a calendar:', error.message)
-          return []
-        }),
+      weeks.flatMap((week) =>
+        busyCalendars.map((calendarId) => busyCache.current.week(calendarId, week)),
       ),
     ).then((lists) => {
-      // .flat() turns a list of lists into one list.
-      if (active) setBusy(toBusyBlocks(lists.flat()))
+      if (active) setBusy(toBusyBlocks(uniqueEvents(lists)))
     })
 
     return () => {
       active = false
     }
-  }, [calendarToken, busyCalendars, selectedDay])
+  }, [calendarToken, busyCalendars, dayWeek, shownWeek, busyRefresh])
 
   // A new task gets every Phase 11 field. The details come last, so
   // anything the form chose (including a category set by an Area) wins.
@@ -514,6 +618,68 @@ function App() {
     setTemplates(templates.filter((template) => template.id !== id))
   }
 
+  // ---- Planning (Phase 12) ----
+
+  function changeTab(next) {
+    setTab(next)
+    // Writing the address adds a step to the browser's history, so the
+    // back button returns to the previous screen.
+    window.location.hash = next
+  }
+
+  // "Place on…" and dropping a task on a day. A task that had a time keeps
+  // it on the new day; one without goes in as "any time".
+  function placeTask(id, day) {
+    const task = tasks.find((item) => item.id === id)
+    if (!task) return
+    const time = timeOf(task)
+    updateTask(id, time ? { start: `${day}T${time}`, day: day } : placeOn(day))
+  }
+
+  // Dragged back to To place: no day, no time.
+  function unplaceTask(id) {
+    updateTask(id, { start: null, day: null })
+  }
+
+  function halveTask(id) {
+    updateTask(id, halved(tasks.find((task) => task.id === id)))
+  }
+
+  // Dropping is deleting, with a few seconds to change your mind.
+  function dropTask(id) {
+    const index = tasks.findIndex((task) => task.id === id)
+    if (index === -1) return
+    const task = tasks[index]
+    setTasks(tasks.filter((item) => item.id !== id))
+    setUndo({ message: `Dropped ${task.title}.`, task: task, index: index })
+  }
+
+  function undoDrop() {
+    if (!undo) return
+    const { task, index } = undo
+    setTasks((current) => {
+      if (current.some((item) => item.id === task.id)) return current
+      const next = [...current]
+      next.splice(Math.min(index, next.length), 0, task)
+      return next
+    })
+    setUndo(null)
+  }
+
+  // The answer to the morning question. Either way, it's not asked again
+  // today.
+  function answerRollover(move) {
+    if (move) setTasks((current) => rollOver(current, today))
+    setRolloverAsked(today)
+    saveRolloverAsked(today)
+  }
+
+  // From the Week screen: open that day on the Day screen.
+  function openDay(day) {
+    goToDay(day)
+    changeTab('day')
+  }
+
   // ---- Areas ----
 
   function addArea(details) {
@@ -547,16 +713,32 @@ function App() {
   // That includes the ones placed "any time" on it.
   const dayTasks = [...tasks].filter((task) => dayOf(task) === selectedDay).sort(byTime)
 
-  // Tasks with no day yet, still to do.
-  const toPlace = tasks.filter(
-    (task) => placementOf(task) === 'unplaced' && task.status !== 'done',
-  )
+  // Tasks with no day yet, still to do, in the order to deal with them.
+  const toPlace = toPlaceList(tasks)
+
+  // The Day screen's capacity: fixed, planned and free hours.
+  const selectedSummary = daySummary(selectedDay, {
+    tasks: tasks,
+    busy: busy,
+    settings: settings,
+    away: away,
+  })
+
+  // The morning question: only when rollover is on, there's something to
+  // move, and it hasn't been answered today.
+  const rolloverCount =
+    settings.rolloverEnabled && rolloverAsked !== today
+      ? rolloverCandidates(tasks, today).length
+      : 0
 
   return (
-    <main className="app">
+    // The Week screen needs more room than a phone column on a computer.
+    <main className={tab === 'week' ? 'app wide' : 'app'}>
       <header className="app-header">
         <h1>Dagen</h1>
-        <p className="today">{formatDay(selectedDay, new Date(`${today}T12:00`))}</p>
+        {tab === 'day' && (
+          <p className="today">{formatDay(selectedDay, new Date(`${today}T12:00`))}</p>
+        )}
 
         {/* Filled while its panel is open, outline when closed. */}
         <Button
@@ -641,49 +823,101 @@ function App() {
       {showTemplates && (
         <TemplatePanel
           templates={templates}
+          areas={areas}
           onAdd={addTemplate}
           onDelete={deleteTemplate}
         />
       )}
 
-      <WeekStrip
-        days={days}
-        selectedDay={selectedDay}
-        today={today}
-        markers={markers}
-        monthLabel={formatMonthLabel(days)}
-        onSelect={goToDay}
-        // Moving a week keeps the same weekday: Wednesday to Wednesday.
-        onShiftWeek={(amount) => goToDay(addDays(selectedDay, amount * 7))}
-        onToday={() => goToDay(today)}
-      />
+      {rolloverCount > 0 && (
+        <RolloverPrompt
+          count={rolloverCount}
+          onMove={() => answerRollover(true)}
+          onDismiss={() => answerRollover(false)}
+        />
+      )}
 
-      {CATEGORIES.map((category) => (
-        <CategorySection
-          key={category.id}
-          category={category}
+      <TabBar tab={tab} onChange={changeTab} />
+
+      {tab === 'day' && (
+        <>
+          <WeekStrip
+            days={days}
+            selectedDay={selectedDay}
+            today={today}
+            markers={markers}
+            monthLabel={formatMonthLabel(days)}
+            onSelect={goToDay}
+            // Moving a week keeps the same weekday: Wednesday to Wednesday.
+            onShiftWeek={(amount) => goToDay(addDays(selectedDay, amount * 7))}
+            onToday={() => goToDay(today)}
+          />
+
+          {/* The finding first: "Friday · 3h free", or by how much it's over. */}
+          <h2 className="headline">{dayHeadline(selectedSummary)}</h2>
+          <CapacityBar summary={selectedSummary} />
+
+          {CATEGORIES.map((category) => (
+            <CategorySection
+              key={category.id}
+              category={category}
+              areas={areas}
+              tasks={dayTasks.filter((task) => task.categoryId === category.id)}
+              allTasks={[...tasks, ...busy]}
+              conflicts={conflicts}
+              selectedDay={selectedDay}
+              isCollapsed={collapsed.includes(category.id)}
+              onToggleCollapse={toggleCollapse}
+              onAdd={addTask}
+              onUpdateTask={updateTask}
+              onToggleTask={toggleTask}
+              onDeleteTask={deleteTask}
+            />
+          ))}
+
+          <ToPlaceSection
+            tasks={toPlace}
+            areas={areas}
+            allTasks={tasks}
+            today={today}
+            onUpdateTask={updateTask}
+            onToggleTask={toggleTask}
+            onDeleteTask={deleteTask}
+            onPlace={placeTask}
+            onHalve={halveTask}
+            onDrop={dropTask}
+            onDragStart={(event, task) => event.dataTransfer.setData('text/plain', task.id)}
+            onDropHere={unplaceTask}
+          />
+        </>
+      )}
+
+      {tab === 'week' && (
+        <WeekView
+          weekDay={weekDay}
+          today={today}
+          tasks={tasks}
+          busy={busy}
           areas={areas}
-          tasks={dayTasks.filter((task) => task.categoryId === category.id)}
-          allTasks={tasks}
+          settings={settings}
+          away={away}
           conflicts={conflicts}
-          selectedDay={selectedDay}
-          isCollapsed={collapsed.includes(category.id)}
-          onToggleCollapse={toggleCollapse}
-          onAdd={addTask}
+          toPlace={toPlace}
+          onShiftWeek={(amount) => setWeekDay(addDays(weekDay, amount * 7))}
+          onThisWeek={() => setWeekDay(today)}
+          onOpenDay={openDay}
           onUpdateTask={updateTask}
           onToggleTask={toggleTask}
           onDeleteTask={deleteTask}
+          onPlace={placeTask}
+          onHalve={halveTask}
+          onDrop={dropTask}
+          onDropOnDay={placeTask}
+          onUnplace={unplaceTask}
         />
-      ))}
+      )}
 
-      <ToPlaceSection
-        tasks={toPlace}
-        areas={areas}
-        allTasks={tasks}
-        onUpdateTask={updateTask}
-        onToggleTask={toggleTask}
-        onDeleteTask={deleteTask}
-      />
+      {undo && <UndoToast message={undo.message} onUndo={undoDrop} />}
     </main>
   )
 }

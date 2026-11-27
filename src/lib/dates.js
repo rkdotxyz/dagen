@@ -205,3 +205,62 @@ export function formatDay(day, now = new Date()) {
     month: 'short',
   })
 }
+
+// ---- Phase 12 ----
+
+// The ISO week number: weeks start on Monday, and week 1 is the one with
+// the year's first Thursday in it. Swedish calendars use the same rule,
+// which is why "vecka 48" matches.
+export function isoWeek(day) {
+  const date = toDate(day)
+  // Move to the Thursday of this week: its year is the week's year.
+  const thursday = new Date(date)
+  thursday.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7))
+  const firstThursday = new Date(thursday.getFullYear(), 0, 4)
+  const days = Math.round((thursday - firstThursday) / 86400000)
+  return 1 + Math.round((days - 3 + ((firstThursday.getDay() + 6) % 7)) / 7)
+}
+
+// "Thursday", for headlines.
+export function weekdayName(day) {
+  return WEEKDAY_NAMES[weekdayIndex(day)]
+}
+
+// "Thu 3 Dec", always, even for today: deadlines read better as dates.
+export function formatShortDay(day) {
+  return toDate(day).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+// "23 Nov – 29 Nov", the dates of a week, for the Week screen.
+export function formatDayRange(first, last) {
+  const format = (day) =>
+    toDate(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  return `${format(first)} – ${format(last)}`
+}
+
+// Whole days from one day to another: daysBetween("2026-11-27",
+// "2026-11-30") is 3. Counted at noon so the clock change can't make a
+// day 23 or 25 hours long.
+export function daysBetween(from, to) {
+  const noon = (day) => new Date(`${day}T12:00`).getTime()
+  return Math.round((noon(to) - noon(from)) / 86400000)
+}
+
+// The days of the month a day is in, first to last.
+export function monthDays(day) {
+  const [year, month] = day.split('-').map(Number)
+  const count = new Date(year, month, 0).getDate() // day 0 = last of previous month
+  const first = `${year}-${String(month).padStart(2, '0')}-01`
+  return Array.from({ length: count }, (_, index) => addDays(first, index))
+}
+
+// 1.5 -> "1.5h", 2 -> "2h": hours for headlines, at most one decimal.
+export function formatHours(hours) {
+  const rounded = Math.round(hours * 10) / 10
+  return `${rounded}h`
+}
+
