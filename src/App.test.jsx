@@ -740,16 +740,18 @@ function showDay(day) {
 }
 const yesterday = addDays(today, -1)
 
-test('the tabs switch between Day and Week, and the others are coming soon', () => {
+test('the tabs switch between screens, and all five are on', () => {
   render(<App />)
   expect(screen.queryByRole('region', { name: 'Week' })).toBeNull()
 
   openTab('Week')
   expect(weekScreen().getByText(new RegExp(`^Week ${isoWeek(today)} has`))).toBeTruthy()
   expect(window.location.hash).toBe('#week')
-  // Changed in Phases 14 and 15 (on purpose): Month and Quarter are
-  // ready, so Insights is the one still to come.
-  expect(screen.getByRole('button', { name: 'Insights (coming soon)' }).disabled).toBe(true)
+  // Changed in Phases 14–16 (on purpose): every screen has arrived, so
+  // nothing is "coming soon" any more.
+  const tabs = within(screen.getByRole('navigation', { name: 'Views' })).getAllByRole('button')
+  expect(tabs.map((tab) => tab.textContent)).toEqual(['Day', 'Week', 'Month', 'Quarter', 'Insights'])
+  expect(tabs.every((tab) => !tab.disabled)).toBe(true)
 
   openTab('Day')
   expect(screen.queryByRole('region', { name: 'Week' })).toBeNull()
@@ -1379,4 +1381,99 @@ test('an Area can be given start and end days', () => {
     startDay: '2026-12-10',
     endDay: '2027-01-20',
   })
+})
+
+// ---- Phase 16: Insights ----
+
+function insightsScreen() {
+  return within(screen.getByRole('region', { name: 'Insights' }))
+}
+
+function seedEntries(entries) {
+  localStorage.setItem(
+    'dagen.entries.v1',
+    JSON.stringify(
+      entries.map((entry, index) => ({
+        id: `e${index}`,
+        taskId: null,
+        areaId: null,
+        categoryId: 'projects',
+        source: 'timer',
+        ...entry,
+      })),
+    ),
+  )
+}
+
+test('with nothing tracked, Insights says so and shows dashes, never NaN', () => {
+  render(<App />)
+  openTab('Insights')
+
+  expect(insightsScreen().getByRole('heading', { name: 'Nothing tracked this week yet' })).toBeTruthy()
+  const estimates = within(insightsScreen().getByRole('group', { name: 'Estimates vs reality' }))
+  expect(estimates.getByText('—')).toBeTruthy()
+  expect(estimates.getByText('Tick off tasks you tracked time on')).toBeTruthy()
+  expect(screen.queryByText(/NaN/)).toBeNull()
+  expect(window.location.hash).toBe('#insights')
+})
+
+test('Insights names where the week went, with hours and shares', () => {
+  // Both start today, so they're in this week whatever day it is.
+  seedEntries([
+    { label: 'Exhibit', categoryId: 'projects', start: `${today}T00:00`, end: `${today}T03:00` },
+    { label: 'Lecture notes', categoryId: 'classes', start: `${today}T03:00`, end: `${today}T04:00` },
+  ])
+  render(<App />)
+  openTab('Insights')
+
+  // Most first: Projects (3h) then Classes (1h).
+  expect(insightsScreen().getByRole('heading', { name: 'This week went to Projects and Classes' })).toBeTruthy()
+  const split = within(screen.getByRole('region', { name: 'Split by category' }))
+  expect(split.getByText('3h · 75%')).toBeTruthy()
+  expect(split.getByText('1h · 25%')).toBeTruthy()
+
+  const top = within(screen.getByRole('region', { name: 'Where the hours went' }))
+  expect(top.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Exhibit3h', 'Lecture notes1h'])
+})
+
+test('the most-behind tile and the paused-but-used tile name their Areas', () => {
+  seedAreas([
+    { id: 'a_rk', name: 'Räckvidd', monthlyBudgetHours: 30 },
+    { id: 'a_gb', name: 'Gesture bloom', status: 'paused' },
+  ])
+  seedEntries([{ label: 'Bloom', areaId: 'a_gb', start: `${today}T00:00`, end: `${today}T00:30` }])
+  render(<App />)
+  openTab('Insights')
+
+  expect(within(insightsScreen().getByRole('group', { name: 'Most behind plan' })).getByText('Räckvidd')).toBeTruthy()
+  expect(within(insightsScreen().getByRole('group', { name: 'Paused but still used' })).getByText('Gesture bloom')).toBeTruthy()
+})
+
+test('the period switch moves to the month and the quarter', () => {
+  render(<App />)
+  openTab('Insights')
+
+  fireEvent.click(insightsScreen().getByRole('button', { name: 'Month' }))
+  expect(insightsScreen().getByRole('button', { name: 'Month' }).getAttribute('aria-pressed')).toBe('true')
+  expect(insightsScreen().getByRole('heading', { name: /^Nothing tracked in \w+ yet$/ })).toBeTruthy()
+
+  fireEvent.click(insightsScreen().getByRole('button', { name: 'Quarter' }))
+  expect(insightsScreen().getByRole('heading', { name: /^Nothing tracked in \w+ – \w+ yet$/ })).toBeTruthy()
+})
+
+test('Areas touched per day shows the last 14 days', () => {
+  seedAreas([
+    { id: 'a1', name: 'One' },
+    { id: 'a2', name: 'Two' },
+  ])
+  seedEntries([
+    { label: 'x', areaId: 'a1', start: `${today}T00:00`, end: `${today}T00:10` },
+    { label: 'y', areaId: 'a2', start: `${today}T00:10`, end: `${today}T00:20` },
+  ])
+  render(<App />)
+  openTab('Insights')
+
+  const switching = within(screen.getByRole('region', { name: 'Areas touched per day' }))
+  expect(switching.getAllByRole('listitem')).toHaveLength(14)
+  expect(switching.getByLabelText(`${formatShortDay(today)}: 2 Areas`)).toBeTruthy()
 })
