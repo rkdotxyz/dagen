@@ -10,7 +10,9 @@
 */
 
 import { useState } from 'react'
-import { DrawablyBadge, DrawablyButton, DrawablyDivider } from 'drawably/react'
+import { PlusIcon } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import TaskForm from './TaskForm.jsx'
 import TaskItem from './TaskItem.jsx'
 import { findArea } from '../lib/areas.js'
@@ -48,24 +50,21 @@ function CategorySection({
           onClick={() => onToggleCollapse(category.id)}
           aria-expanded={!isCollapsed}
         >
-          {/* The one place Google's category colour still appears: a solid
-              swatch with a white ring, so even the darker Google colours
-              stay visible on blue paper. */}
+          {/* The category's Google colour, as a solid dot. */}
           <span className="dot" style={{ backgroundColor: category.hex }} />
           <span className="category-name">{category.name}</span>
-          <DrawablyBadge className="category-count">{remaining}</DrawablyBadge>
+          <Badge variant="secondary">{remaining}</Badge>
         </button>
 
-        <DrawablyButton
-          className="add-button"
+        <Button
+          variant="outline"
+          size="icon"
           onClick={startAdding}
           aria-label={`Add to ${category.name}`}
         >
-          +
-        </DrawablyButton>
+          <PlusIcon />
+        </Button>
       </div>
-
-      <DrawablyDivider className="category-rule" />
 
       {!isCollapsed && (
         <>

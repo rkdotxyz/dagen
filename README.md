@@ -25,6 +25,7 @@ Then open http://localhost:5173
 - [x] Phase 8: Push to Google Calendar
 - [x] Phase 9: Two-way sync and busy calendars (v2.0)
 - [x] Phase 10: Blueprint look with drawably
+- [x] Plain shadcn/ui look in place of drawably, for now (the design comes later)
 
 ### Dagen Horizon (v3.0)
 

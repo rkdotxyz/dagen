@@ -6,24 +6,32 @@
   choice is yours rather than guessed.
 */
 
-import { DrawablyCard, DrawablyCheckbox } from 'drawably/react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 
 function CalendarPicker({ calendars, chosen, onToggle }) {
   if (calendars.length === 0) {
     return (
       <section className="templates" aria-label="Busy calendars">
-        <DrawablyCard className="panel-card">
-          <h2>Busy calendars</h2>
-          <p className="empty">Connect the calendar to choose.</p>
-        </DrawablyCard>
+        <Card className="panel-card">
+          <CardHeader>
+            <CardTitle>Busy calendars</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="empty">Connect the calendar to choose.</p>
+          </CardContent>
+        </Card>
       </section>
     )
   }
 
   return (
     <section className="templates" aria-label="Busy calendars">
-      <DrawablyCard className="panel-card">
-        <h2>Busy calendars</h2>
+      <Card className="panel-card">
+        <CardHeader>
+          <CardTitle>Busy calendars</CardTitle>
+        </CardHeader>
+        <CardContent>
         <p className="empty">
           Tasks that overlap anything in these calendars are flagged.
         </p>
@@ -32,9 +40,10 @@ function CalendarPicker({ calendars, chosen, onToggle }) {
           {calendars.map((calendar) => (
             <li key={calendar.id} className="template">
               <label className="tentative-toggle">
-                <DrawablyCheckbox
+                {/* Radix's checkbox reports through onCheckedChange. */}
+                <Checkbox
                   checked={chosen.includes(calendar.id)}
-                  onChange={() => onToggle(calendar.id)}
+                  onCheckedChange={() => onToggle(calendar.id)}
                 />
                 {calendar.name}
                 {calendar.primary && ' (main)'}
@@ -42,7 +51,8 @@ function CalendarPicker({ calendars, chosen, onToggle }) {
             </li>
           ))}
         </ul>
-      </DrawablyCard>
+        </CardContent>
+      </Card>
     </section>
   )
 }

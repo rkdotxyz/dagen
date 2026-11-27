@@ -9,18 +9,17 @@
   It can also belong to an Area. Picking an Area sets the category too,
   because an Area lives inside one category.
 
-  Every field is a drawably control: the same <input>, <select> and
-  <button> elements as before, with a sketch layered behind.
+  The fields are shadcn/ui components: Input, NativeSelect (a real
+  <select>), Button chips and a Switch for "tentative".
 */
 
-import { useState } from 'react'
-import {
-  DrawablyButton,
-  DrawablyCard,
-  DrawablyInput,
-  DrawablySelect,
-  DrawablyToggle,
-} from 'drawably/react'
+import { useId, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Switch } from '@/components/ui/switch'
 import { CATEGORIES } from '../config.js'
 import { findArea, liveAreas } from '../lib/areas.js'
 import { findConflicts } from '../lib/conflicts.js'
@@ -68,6 +67,9 @@ function TaskForm({
   const [durationMin, setDurationMin] = useState(() => task?.durationMin ?? 30)
   const [tentative, setTentative] = useState(() => task?.tentative ?? false)
   const [areaId, setAreaId] = useState(() => task?.areaId ?? '')
+  // A unique id per form, so the "Tentative" label can point at its switch
+  // even when several forms are open at once.
+  const tentativeId = useId()
 
   const isEditing = Boolean(task)
   // A start only exists when there's both a day and a time.
@@ -127,10 +129,10 @@ function TaskForm({
   const groups = areaGroups(areas, task?.areaId)
 
   return (
-    // The card is the sketched frame; the form inside it does the work.
-    <DrawablyCard className="form-card">
+    // The card is the frame; the form inside it does the work.
+    <Card className="form-card px-4">
       <form className="task-form" onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
-        <DrawablyInput
+        <Input
           className="field"
           type="text"
           value={title}
@@ -143,7 +145,7 @@ function TaskForm({
         {/* Only shown once you have an Area, so a brand-new planner looks
             exactly as it did before Phase 11. */}
         {liveAreas(areas).length > 0 || task?.areaId ? (
-          <DrawablySelect
+          <NativeSelect
             className="field"
             value={areaId}
             onChange={(event) => setAreaId(event.target.value)}
@@ -161,11 +163,11 @@ function TaskForm({
                 ))}
               </optgroup>
             ))}
-          </DrawablySelect>
+          </NativeSelect>
         ) : null}
 
         <div className="form-row">
-          <DrawablyInput
+          <Input
             className="field"
             type="date"
             value={day}
@@ -175,7 +177,7 @@ function TaskForm({
 
           {/* Without a day there's nothing for a time to belong to, so the
               list is switched off until a day is picked. */}
-          <DrawablySelect
+          <NativeSelect
             className="field"
             // With no day it reads "Any time", rather than showing a
             // time that won't be used. The chosen time comes back if you
@@ -191,48 +193,48 @@ function TaskForm({
                 {option}
               </option>
             ))}
-          </DrawablySelect>
+          </NativeSelect>
         </div>
 
-        {/* The chosen duration is drawn "solid", the others in outline.
-            Changing the variant makes drawably sketch that chip afresh,
-            which reads nicely as the pen filling it in. */}
+        {/* The chosen duration is filled in, the others are outlines.
+            aria-pressed tells a screen reader which one is chosen. */}
         <div className="chips" role="group" aria-label="Duration">
           {DURATIONS.map((option) => (
-            <DrawablyButton
+            <Button
               key={option}
-              variant={option === durationMin ? 'solid' : 'outline'}
+              size="sm"
+              variant={option === durationMin ? 'default' : 'outline'}
               aria-pressed={option === durationMin}
-              className="chip"
               onClick={() => setDurationMin(option)}
             >
               {formatDuration(option)}
-            </DrawablyButton>
+            </Button>
           ))}
         </div>
 
         {/* +15m and +1h move a time, so they only work on a timed task. */}
         <div className="chips" role="group" aria-label="Move">
-          <DrawablyButton className="chip" onClick={() => shiftBy(15)} disabled={!start}>
+          <Button size="sm" variant="outline" onClick={() => shiftBy(15)} disabled={!start}>
             +15m
-          </DrawablyButton>
-          <DrawablyButton className="chip" onClick={() => shiftBy(60)} disabled={!start}>
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => shiftBy(60)} disabled={!start}>
             +1h
-          </DrawablyButton>
-          <DrawablyButton
-            className="chip"
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => setDay(addDays(day || todayISO(), 1))}
           >
             Tomorrow
-          </DrawablyButton>
-          <DrawablyButton
-            className="chip"
-            variant={day ? 'outline' : 'solid'}
+          </Button>
+          <Button
+            size="sm"
+            variant={day ? 'outline' : 'default'}
             aria-pressed={!day}
             onClick={() => setDay('')}
           >
             No day yet
-          </DrawablyButton>
+          </Button>
         </div>
 
         <p className="form-summary">
@@ -246,25 +248,22 @@ function TaskForm({
         </p>
 
         <div className="form-row">
-          {/* A sketched switch. Underneath it is still a checkbox, with
-              role="switch" so screen readers announce it as on or off. */}
-          <label className="tentative-toggle">
-            <DrawablyToggle
-              checked={tentative}
-              onChange={(event) => setTentative(event.target.checked)}
-            />
-            Tentative
-          </label>
+          {/* A switch, announced as on or off. The label points at it by
+              id (htmlFor), so tapping the word works too. */}
+          <div className="tentative-toggle">
+            <Switch id={tentativeId} checked={tentative} onCheckedChange={setTentative} />
+            <Label htmlFor={tentativeId}>Tentative</Label>
+          </div>
 
-          <DrawablyButton type="submit" variant="solid">
-            {isEditing ? 'Save' : 'Add'}
-          </DrawablyButton>
-          <DrawablyButton onClick={onCancel}>
-            {isEditing ? 'Cancel' : 'Done'}
-          </DrawablyButton>
+          <div className="form-actions">
+            <Button type="submit">{isEditing ? 'Save' : 'Add'}</Button>
+            <Button variant="outline" onClick={onCancel}>
+              {isEditing ? 'Cancel' : 'Done'}
+            </Button>
+          </div>
         </div>
       </form>
-    </DrawablyCard>
+    </Card>
   )
 }
 

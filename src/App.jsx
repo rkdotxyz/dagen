@@ -13,7 +13,7 @@
 */
 
 import { useEffect, useRef, useState } from 'react'
-import { DrawablyButton } from 'drawably/react'
+import { Button } from '@/components/ui/button'
 import AccountBar from './components/AccountBar.jsx'
 import AreasPanel from './components/AreasPanel.jsx'
 import CalendarBar from './components/CalendarBar.jsx'
@@ -558,24 +558,23 @@ function App() {
         <h1>Dagen</h1>
         <p className="today">{formatDay(selectedDay, new Date(`${today}T12:00`))}</p>
 
-        {/* Drawn solid while its panel is open, outline when closed. */}
-        <DrawablyButton
+        {/* Filled while its panel is open, outline when closed. */}
+        <Button
           className="areas-button"
-          variant={showAreas ? 'solid' : 'outline'}
+          variant={showAreas ? 'default' : 'outline'}
           onClick={() => setShowAreas(!showAreas)}
           aria-expanded={showAreas}
         >
           Areas
-        </DrawablyButton>
+        </Button>
 
-        <DrawablyButton
-          className="repeats-button"
-          variant={showTemplates ? 'solid' : 'outline'}
+        <Button
+          variant={showTemplates ? 'default' : 'outline'}
           onClick={() => setShowTemplates(!showTemplates)}
           aria-expanded={showTemplates}
         >
           Repeats
-        </DrawablyButton>
+        </Button>
       </header>
 
       <AccountBar

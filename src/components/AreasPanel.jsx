@@ -16,13 +16,12 @@
 */
 
 import { useState } from 'react'
-import {
-  DrawablyButton,
-  DrawablyCard,
-  DrawablyInput,
-  DrawablySelect,
-  DrawablyToggle,
-} from 'drawably/react'
+import { PencilIcon, XIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Switch } from '@/components/ui/switch'
 import { CATEGORIES, getCategory } from '../config.js'
 import {
   AREA_STATUSES,
@@ -83,7 +82,7 @@ function AreaForm({ area, onSubmit, onCancel }) {
     // on the hours box), so our messages under the fields are the ones
     // you see, the same on every browser.
     <form className="task-form area-form" onSubmit={handleSubmit} noValidate>
-      <DrawablyInput
+      <Input
         className="field"
         type="text"
         value={name}
@@ -94,7 +93,7 @@ function AreaForm({ area, onSubmit, onCancel }) {
       />
 
       <div className="form-row">
-        <DrawablySelect
+        <NativeSelect
           className="field"
           value={categoryId}
           onChange={(event) => setCategoryId(event.target.value)}
@@ -105,9 +104,9 @@ function AreaForm({ area, onSubmit, onCancel }) {
               {category.name}
             </option>
           ))}
-        </DrawablySelect>
+        </NativeSelect>
 
-        <DrawablySelect
+        <NativeSelect
           className="field"
           value={status}
           onChange={(event) => setStatus(event.target.value)}
@@ -118,9 +117,9 @@ function AreaForm({ area, onSubmit, onCancel }) {
               {STATUS_NAMES[option]}
             </option>
           ))}
-        </DrawablySelect>
+        </NativeSelect>
 
-        <DrawablyInput
+        <Input
           className="field budget-field"
           type="number"
           min="0"
@@ -132,7 +131,7 @@ function AreaForm({ area, onSubmit, onCancel }) {
         />
       </div>
 
-      <DrawablyInput
+      <Input
         className="field"
         type="text"
         value={outcome}
@@ -149,10 +148,12 @@ function AreaForm({ area, onSubmit, onCancel }) {
       )}
 
       <div className="form-row">
-        <DrawablyButton type="submit" variant="solid">
-          {area ? 'Save' : 'Add Area'}
-        </DrawablyButton>
-        {onCancel && <DrawablyButton onClick={onCancel}>Cancel</DrawablyButton>}
+        <Button type="submit">{area ? 'Save' : 'Add Area'}</Button>
+        {onCancel && (
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
       </div>
     </form>
   )
@@ -189,19 +190,19 @@ function AreaRow({ area, tasks, entries, onUpdate, onRemove }) {
         <span className="area-text">
           {area.name} still has {usedBy}. Archive it? Its history stays.
         </span>
-        <DrawablyButton
-          className="row-button"
-          tone="danger"
+        <Button
+          size="sm"
+          variant="destructive"
           onClick={() => {
             onRemove(area.id)
             setMode('view')
           }}
         >
           Archive
-        </DrawablyButton>
-        <DrawablyButton className="row-button" onClick={() => setMode('view')}>
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setMode('view')}>
           Keep
-        </DrawablyButton>
+        </Button>
       </li>
     )
   }
@@ -219,33 +220,36 @@ function AreaRow({ area, tasks, entries, onUpdate, onRemove }) {
       </span>
 
       {area.archived ? (
-        <DrawablyButton
-          className="row-button"
+        <Button
+          size="sm"
+          variant="outline"
           onClick={() => onUpdate(area.id, { archived: false })}
           aria-label={`Restore ${area.name}`}
         >
-          restore
-        </DrawablyButton>
+          Restore
+        </Button>
       ) : (
         <>
-          <DrawablyButton
-            className="row-button"
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setMode('edit')}
             aria-label={`Edit ${area.name}`}
           >
-            edit
-          </DrawablyButton>
-          <DrawablyButton
-            className="row-button"
-            tone="danger"
+            <PencilIcon />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-destructive hover:text-destructive"
             onClick={() =>
               // In use: ask first. Not in use: nothing is lost, so just go.
               isInUse(area.id, tasks, entries) ? setMode('confirm') : onRemove(area.id)
             }
             aria-label={`Delete ${area.name}`}
           >
-            x
-          </DrawablyButton>
+            <XIcon />
+          </Button>
         </>
       )}
     </li>
@@ -273,10 +277,13 @@ function AreasPanel({
 
   return (
     <section className="templates areas" aria-label="Areas">
-      <DrawablyCard className="panel-card">
-        <h2>
-          Areas <span className="heading-note">{active} active</span>
-        </h2>
+      <Card className="panel-card">
+        <CardHeader>
+          <CardTitle>Areas</CardTitle>
+          <span className="heading-note">{active} active</span>
+        </CardHeader>
+
+        <CardContent>
 
         {/* A warning, never a block: sometimes six things really are on. */}
         {active > settings.activeAreaLimit && (
@@ -330,7 +337,7 @@ function AreasPanel({
         <div className="form-row settings-row">
           <label className="setting">
             Free hours, weekdays
-            <DrawablySelect
+            <NativeSelect
               className="field"
               value={settings.capacity.weekday}
               // Number(...) because a <select> always hands back text.
@@ -341,12 +348,12 @@ function AreasPanel({
                   {hours}h
                 </option>
               ))}
-            </DrawablySelect>
+            </NativeSelect>
           </label>
 
           <label className="setting">
             Free hours, weekends
-            <DrawablySelect
+            <NativeSelect
               className="field"
               value={settings.capacity.weekend}
               onChange={(event) => setCapacity('weekend', Number(event.target.value))}
@@ -356,12 +363,12 @@ function AreasPanel({
                   {hours}h
                 </option>
               ))}
-            </DrawablySelect>
+            </NativeSelect>
           </label>
 
           <label className="setting">
             Active Area limit
-            <DrawablySelect
+            <NativeSelect
               className="field"
               value={settings.activeAreaLimit}
               onChange={(event) =>
@@ -373,15 +380,17 @@ function AreasPanel({
                   {limit}
                 </option>
               ))}
-            </DrawablySelect>
+            </NativeSelect>
           </label>
         </div>
 
+        {/* This switch isn't inside a <form>, so wrapping it in the label
+            is enough to make the words clickable. */}
         <label className="tentative-toggle">
-          <DrawablyToggle
+          <Switch
             checked={settings.rolloverEnabled}
-            onChange={(event) =>
-              onChangeSettings({ ...settings, rolloverEnabled: event.target.checked })
+            onCheckedChange={(checked) =>
+              onChangeSettings({ ...settings, rolloverEnabled: checked })
             }
           />
           Offer to roll over unfinished tasks each morning
@@ -390,7 +399,8 @@ function AreasPanel({
         <p className="form-summary">
           Free hours and rollover start working with the Week view (next phase).
         </p>
-      </DrawablyCard>
+        </CardContent>
+      </Card>
     </section>
   )
 }

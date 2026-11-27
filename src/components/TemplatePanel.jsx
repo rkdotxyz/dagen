@@ -4,16 +4,16 @@
   A template is a rule: what, where, how often, when and for how long.
   Nothing here knows how the rules turn into tasks; that's recurring.js.
 
-  The whole panel is a sketched card, and its fields are drawably's.
+  The whole panel is a shadcn/ui Card, with its Input, NativeSelect and
+  Button inside.
 */
 
 import { useState } from 'react'
-import {
-  DrawablyButton,
-  DrawablyCard,
-  DrawablyInput,
-  DrawablySelect,
-} from 'drawably/react'
+import { XIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
 import { CATEGORIES, getCategory } from '../config.js'
 import { DURATIONS, QUARTER_TIMES, WEEKDAY_NAMES, formatDuration } from '../lib/dates.js'
 
@@ -53,8 +53,11 @@ function TemplatePanel({ templates, onAdd, onDelete }) {
 
   return (
     <section className="templates" aria-label="Recurring chores">
-      <DrawablyCard className="panel-card">
-        <h2>Recurring chores</h2>
+      <Card className="panel-card">
+        <CardHeader>
+          <CardTitle>Recurring chores</CardTitle>
+        </CardHeader>
+        <CardContent>
 
         {templates.length === 0 ? (
           <p className="empty">
@@ -72,21 +75,22 @@ function TemplatePanel({ templates, onAdd, onDelete }) {
                   <span>{template.title}</span>
                   <span className="task-when">{describe(template)}</span>
                 </span>
-                <DrawablyButton
-                  className="row-button"
-                  tone="danger"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive hover:text-destructive"
                   onClick={() => onDelete(template.id)}
                   aria-label={`Delete the ${template.title} chore`}
                 >
-                  x
-                </DrawablyButton>
+                  <XIcon />
+                </Button>
               </li>
             ))}
           </ul>
         )}
 
         <form className="task-form" onSubmit={handleSubmit}>
-          <DrawablyInput
+          <Input
             className="field"
             type="text"
             value={title}
@@ -96,7 +100,7 @@ function TemplatePanel({ templates, onAdd, onDelete }) {
           />
 
           <div className="form-row">
-            <DrawablySelect
+            <NativeSelect
               className="field"
               value={categoryId}
               onChange={(event) => setCategoryId(event.target.value)}
@@ -107,9 +111,9 @@ function TemplatePanel({ templates, onAdd, onDelete }) {
                   {category.name}
                 </option>
               ))}
-            </DrawablySelect>
+            </NativeSelect>
 
-            <DrawablySelect
+            <NativeSelect
               className="field"
               value={repeat}
               onChange={(event) => setRepeat(event.target.value)}
@@ -117,12 +121,12 @@ function TemplatePanel({ templates, onAdd, onDelete }) {
             >
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
-            </DrawablySelect>
+            </NativeSelect>
 
             {/* The weekday only matters for a weekly chore, so it only
               appears when one is chosen. */}
             {repeat === 'weekly' && (
-              <DrawablySelect
+              <NativeSelect
                 className="field"
                 value={weekday}
                 onChange={(event) => setWeekday(event.target.value)}
@@ -133,10 +137,10 @@ function TemplatePanel({ templates, onAdd, onDelete }) {
                     {name}
                   </option>
                 ))}
-              </DrawablySelect>
+              </NativeSelect>
             )}
 
-            <DrawablySelect
+            <NativeSelect
               className="field"
               value={time}
               onChange={(event) => setTime(event.target.value)}
@@ -147,30 +151,29 @@ function TemplatePanel({ templates, onAdd, onDelete }) {
                   {option}
                 </option>
               ))}
-            </DrawablySelect>
+            </NativeSelect>
           </div>
 
           <div className="chips" role="group" aria-label="Chore duration">
             {DURATIONS.map((option) => (
-              <DrawablyButton
+              <Button
                 key={option}
-                variant={option === durationMin ? 'solid' : 'outline'}
+                size="sm"
+                variant={option === durationMin ? 'default' : 'outline'}
                 aria-pressed={option === durationMin}
-                className="chip"
                 onClick={() => setDurationMin(option)}
               >
                 {formatDuration(option)}
-              </DrawablyButton>
+              </Button>
             ))}
           </div>
 
           <div className="form-row">
-            <DrawablyButton type="submit" variant="solid">
-              Add chore
-            </DrawablyButton>
+            <Button type="submit">Add chore</Button>
           </div>
         </form>
-      </DrawablyCard>
+        </CardContent>
+      </Card>
     </section>
   )
 }

@@ -7,9 +7,6 @@
   list of calendars that count as busy.
 */
 
-// Each link gets a pen underline, re-sketched whenever you hover it.
-import { DrawablyUnderline } from 'drawably/react'
-
 function CalendarBar({
   session,
   token,
@@ -26,7 +23,7 @@ function CalendarBar({
       <p className="account">
         Not in Google Calendar yet.{' '}
         <button type="button" className="link" onClick={onConnect}>
-          <DrawablyUnderline>Connect calendar</DrawablyUnderline>
+          Connect calendar
         </button>
       </p>
     )
@@ -37,14 +34,14 @@ function CalendarBar({
       <span>In Google Calendar</span>
       {sending && <span className="syncing"> · sending…</span>}{' '}
       <button type="button" className="link" onClick={onChooseCalendars}>
-        <DrawablyUnderline>Busy calendars</DrawablyUnderline>
+        Busy calendars
       </button>
       {failures > 0 && (
         <span className="clash-note">
           {' '}
           ⚠ {failures} change{failures === 1 ? '' : 's'} could not be sent.{' '}
           <button type="button" className="link" onClick={onConnect}>
-            <DrawablyUnderline>Reconnect</DrawablyUnderline>
+            Reconnect
           </button>
         </span>
       )}
