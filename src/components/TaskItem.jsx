@@ -13,9 +13,14 @@
   Buttons. Since Phase 12 it also shows the marks from TaskMarks.jsx:
   a lock for fixed events, a star for priorities, and deadline and
   "pushed" pills.
+
+  Since Phase 13 it can start the timer (the play button, or "running"
+  while it's this task's timer), and a block that's over with nothing
+  logged offers "Log as planned". Those come in through the "timer" prop:
+    { runningTaskId, onStart(task), canLogAsPlanned(task), onLogAsPlanned(task) }
 */
 
-import { PencilIcon, XIcon } from 'lucide-react'
+import { PencilIcon, PlayIcon, XIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -45,6 +50,7 @@ function TaskItem({
   conflicts,
   today = todayISO(),
   extra = null,
+  timer = null,
   draggable = false,
   onDragStart,
   onToggle,
@@ -118,6 +124,23 @@ function TaskItem({
           </span>
         </label>
 
+        {/* Start this task's timer, or show that it's the one running. */}
+        {timer &&
+          (timer.runningTaskId === task.id ? (
+            <Badge className="running-badge">running</Badge>
+          ) : (
+            !isDone && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => timer.onStart(task)}
+                aria-label={`Start ${task.title}`}
+              >
+                <PlayIcon />
+              </Button>
+            )
+          ))}
+
         {/* Icon-only buttons. The aria-labels are what screen readers (and
             the tests) use, so they say exactly what each one does. */}
         <Button
@@ -141,6 +164,15 @@ function TaskItem({
         </div>
 
         {extra}
+
+        {/* Over, and nothing logged: one tap records it as it was planned. */}
+        {timer?.canLogAsPlanned(task) && (
+          <div className="to-place-actions">
+            <Button size="sm" variant="outline" onClick={() => timer.onLogAsPlanned(task)}>
+              Log as planned
+            </Button>
+          </div>
+        )}
       </Card>
     </li>
   )

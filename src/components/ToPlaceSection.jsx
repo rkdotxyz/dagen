@@ -36,6 +36,7 @@ function ToPlaceSection({
   areas,
   allTasks,
   today,
+  timer = null,
   onUpdateTask,
   onToggleTask,
   onDeleteTask,
@@ -147,6 +148,7 @@ function ToPlaceSection({
                 // Unplaced tasks have no time, so nothing can clash.
                 conflicts={[]}
                 extra={extraFor(task)}
+                timer={timer}
                 draggable
                 onDragStart={onDragStart}
                 onToggle={onToggleTask}

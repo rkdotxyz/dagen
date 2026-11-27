@@ -966,3 +966,173 @@ test('a deadline and priority can be set in the form', () => {
   expect(toPlace().getByText('start now')).toBeTruthy()
   expect(toPlace().getByRole('img', { name: 'Priority' })).toBeTruthy()
 })
+
+// ---- Phase 13: the timer and time log ----
+
+function nowBar() {
+  return within(screen.getByRole('region', { name: 'Now' }))
+}
+
+function timeLog() {
+  return within(screen.getByRole('region', { name: 'Time log' }))
+}
+
+// A timer as if started some minutes ago (and saved), so stopping it
+// makes a real entry without the test having to wait.
+function seedTimer(minutesAgo, details = {}) {
+  localStorage.setItem(
+    'dagen.timer.v1',
+    JSON.stringify({
+      taskId: null,
+      areaId: null,
+      categoryId: 'learning',
+      label: 'Reading',
+      startedAt: new Date(Date.now() - minutesAgo * 60000).toISOString(),
+      ...details,
+    }),
+  )
+}
+
+function savedEntries() {
+  return JSON.parse(localStorage.getItem('dagen.entries.v1') ?? '[]')
+}
+
+test('with nothing running, the Now bar offers Log time', () => {
+  render(<App />)
+  expect(nowBar().getByText('Nothing running')).toBeTruthy()
+  expect(nowBar().getByRole('button', { name: 'Log time' })).toBeTruthy()
+  // Nothing tracked yet, so nothing to resume.
+  expect(nowBar().queryByRole('button', { name: /^Resume/ })).toBeNull()
+})
+
+test('Start on a task runs its timer, and the row says running', () => {
+  seed([{ id: 'a', title: 'Essay', start: `${today}T10:00`, categoryId: 'learning' }])
+  render(<App />)
+
+  fireEvent.click(within(section('Learning')).getByLabelText('Start Essay'))
+
+  expect(nowBar().getByText('Essay')).toBeTruthy()
+  expect(nowBar().getByLabelText('Time so far').textContent).toMatch(/^\d\d:\d\d:\d\d$/)
+  expect(within(section('Learning')).getByText('running')).toBeTruthy()
+})
+
+test('a running timer survives a reload', () => {
+  seedTimer(5)
+  render(<App />)
+  expect(nowBar().getByText('Reading')).toBeTruthy()
+
+  cleanup()
+  render(<App />)
+  expect(nowBar().getByText('Reading')).toBeTruthy()
+  expect(nowBar().getByLabelText('Time so far').textContent).toMatch(/^00:0[45]:\d\d$/)
+})
+
+test('stopping saves exactly one entry, shown in the day\'s time log', () => {
+  seedTimer(30)
+  render(<App />)
+
+  fireEvent.click(nowBar().getByRole('button', { name: 'Stop' }))
+
+  expect(nowBar().getByText('Nothing running')).toBeTruthy()
+  expect(savedEntries()).toHaveLength(1)
+  expect(savedEntries()[0]).toMatchObject({ label: 'Reading', source: 'timer', categoryId: 'learning' })
+  expect(timeLog().getByText('Reading')).toBeTruthy()
+  expect(timeLog().getByText(/30m · timer/)).toBeTruthy()
+})
+
+test('a new start stops the old timer and saves it', () => {
+  seedTimer(20)
+  seed([{ id: 'a', title: 'Essay', start: `${today}T10:00`, categoryId: 'learning' }])
+  render(<App />)
+
+  fireEvent.click(within(section('Learning')).getByLabelText('Start Essay'))
+
+  expect(nowBar().getByText('Essay')).toBeTruthy()
+  expect(savedEntries()).toHaveLength(1)
+  expect(savedEntries()[0].label).toBe('Reading')
+})
+
+test('under a minute is thrown away, and the app says so', () => {
+  seed([{ id: 'a', title: 'Essay', start: `${today}T10:00`, categoryId: 'learning' }])
+  render(<App />)
+
+  fireEvent.click(within(section('Learning')).getByLabelText('Start Essay'))
+  fireEvent.click(nowBar().getByRole('button', { name: 'Stop' }))
+
+  expect(screen.getByText('Under a minute, so it wasn’t saved.')).toBeTruthy()
+  expect(savedEntries()).toEqual([])
+})
+
+test('Resume last restarts what was tracked most recently', () => {
+  seedTimer(15)
+  render(<App />)
+  fireEvent.click(nowBar().getByRole('button', { name: 'Stop' }))
+
+  fireEvent.click(nowBar().getByRole('button', { name: 'Resume Reading' }))
+  expect(nowBar().getByText('Reading')).toBeTruthy()
+  expect(nowBar().getByRole('button', { name: 'Stop' })).toBeTruthy()
+})
+
+test('a past block with nothing logged offers Log as planned, once', () => {
+  seed([{ id: 'a', title: 'Lab report', start: `${yesterday}T10:00`, durationMin: 90, categoryId: 'learning' }])
+  // Yesterday's task would otherwise trigger the morning question.
+  localStorage.setItem('dagen.rolloverAsked.v1', today)
+  render(<App />)
+  fireEvent.click(dayButton(new RegExp(`^${formatDay(yesterday)}`)))
+
+  fireEvent.click(within(section('Learning')).getByRole('button', { name: 'Log as planned' }))
+
+  expect(within(section('Learning')).queryByRole('button', { name: 'Log as planned' })).toBeNull()
+  expect(timeLog().getByText(/10:00–11:30 · 1h 30m · as planned/)).toBeTruthy()
+  expect(savedEntries()).toHaveLength(1)
+})
+
+test('time can be logged by hand, and must end after it starts', () => {
+  render(<App />)
+  fireEvent.click(nowBar().getByRole('button', { name: 'Log time' }))
+  const form = within(screen.getByRole('region', { name: 'Log time' }))
+
+  fireEvent.change(form.getByLabelText('What you worked on'), { target: { value: 'Sketching' } })
+  fireEvent.change(form.getByLabelText('Day of this time'), { target: { value: today } })
+  fireEvent.change(form.getByLabelText('From'), { target: { value: '14:00' } })
+  fireEvent.change(form.getByLabelText('To'), { target: { value: '14:00' } })
+  fireEvent.click(form.getByRole('button', { name: 'Save' }))
+  expect(form.getByRole('alert').textContent).toBe('The end must be after the start.')
+
+  fireEvent.change(form.getByLabelText('To'), { target: { value: '15:15' } })
+  fireEvent.click(form.getByRole('button', { name: 'Save' }))
+
+  expect(screen.queryByRole('region', { name: 'Log time' })).toBeNull()
+  expect(timeLog().getByText(/14:00–15:15 · 1h 15m · by hand/)).toBeTruthy()
+})
+
+test('an entry can be edited, and deleted with Undo', () => {
+  localStorage.setItem(
+    'dagen.entries.v1',
+    JSON.stringify([
+      {
+        id: 'e1',
+        taskId: null,
+        areaId: null,
+        categoryId: 'learning',
+        label: 'Reading',
+        start: `${today}T09:00`,
+        end: `${today}T10:00`,
+        source: 'timer',
+      },
+    ]),
+  )
+  render(<App />)
+
+  fireEvent.click(timeLog().getByLabelText('Edit time: Reading'))
+  const form = within(screen.getByRole('region', { name: 'Edit time' }))
+  fireEvent.change(form.getByLabelText('To'), { target: { value: '10:30' } })
+  fireEvent.click(form.getByRole('button', { name: 'Save' }))
+  expect(timeLog().getByText(/09:00–10:30 · 1h 30m · timer/)).toBeTruthy()
+
+  fireEvent.click(timeLog().getByLabelText('Delete time: Reading'))
+  expect(timeLog().queryByText('Reading')).toBeNull()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(timeLog().getByText('Reading')).toBeTruthy()
+})

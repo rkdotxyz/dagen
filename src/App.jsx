@@ -15,6 +15,10 @@
   bar and remembered in the address (#week). Each keeps its own place:
   the Day screen its day, the Week screen its week. App also asks the
   morning rollover question, and fetches busy calendars a week at a time.
+
+  Since Phase 13 it runs the one timer (timer.js): starting a task stops
+  whatever ran before, every stop saves one time entry, and both the
+  timer and the entries are saved, here and in the cloud.
 */
 
 import { useEffect, useRef, useState } from 'react'
@@ -29,16 +33,28 @@ import RolloverPrompt from './components/RolloverPrompt.jsx'
 import TabBar from './components/TabBar.jsx'
 import TemplatePanel from './components/TemplatePanel.jsx'
 import ToPlaceSection from './components/ToPlaceSection.jsx'
-import UndoToast from './components/UndoToast.jsx'
+import LogTimeForm from './components/LogTimeForm.jsx'
+import NowBar from './components/NowBar.jsx'
+import TimeLog from './components/TimeLog.jsx'
+import Toast from './components/Toast.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
 import WeekView from './components/WeekView.jsx'
-import { CATEGORIES, TABS, getCategory } from './config.js'
+import { CATEGORIES, DEFAULT_CATEGORY_ID, TABS, getCategory } from './config.js'
 import { createArea, removeArea, updateArea } from './lib/areas.js'
 import { toBusyBlocks } from './lib/busy.js'
 import { createBusyCache, uniqueEvents } from './lib/busyCache.js'
 import { daySummary } from './lib/capacity.js'
 import { dayHeadline, halved, placeOn, toPlaceList } from './lib/planning.js'
 import { rollOver, rolloverCandidates } from './lib/rollover.js'
+import {
+  canLogAsPlanned,
+  entriesOn,
+  lastEntry,
+  logAsPlanned,
+  startTimer,
+  stopTimer,
+  timerFor,
+} from './lib/timer.js'
 import { applyPlan, isEmptyPlan, planSync, signatureOf } from './lib/calendarSync.js'
 import { loadPlanner, savePlanner } from './lib/cloud.js'
 import { conflictsById } from './lib/conflicts.js'
@@ -136,7 +152,7 @@ function initialTab() {
 }
 
 // How long the Undo toast stays.
-const UNDO_MS = 6000
+const TOAST_MS = 6000
 
 // Earliest first. Within a day, timed tasks come in clock order and
 // "any time" ones after them. Tasks with no day at all go last.
@@ -197,10 +213,12 @@ function App() {
   // Which screen, and where the Week screen is (any day in its week).
   const [tab, setTab] = useState(() => initialTab())
   const [weekDay, setWeekDay] = useState(() => todayISO())
-  // The day the rollover question was last answered, and what Undo would
-  // put back: { message, task, index } or null.
+  // The day the rollover question was last answered.
   const [rolloverAsked, setRolloverAsked] = useState(() => loadRolloverAsked())
-  const [undo, setUndo] = useState(null)
+  // The message at the bottom: { message, actionLabel?, onAction? } or null.
+  const [toast, setToast] = useState(null)
+  // The Log time form: closed (null), adding ({}), or editing ({ entryId }).
+  const [logForm, setLogForm] = useState(null)
   // The recurring chore rules, and the "don't bring this one back" list.
   const [templates, setTemplates] = useState(() => loadTemplates())
   const [skipped, setSkipped] = useState(() => loadSkipped())
@@ -313,12 +331,12 @@ function App() {
     setTasks((current) => fillDays(current, weekDays(weekDay), templates, skipped))
   }, [tab, weekDay, templates, skipped])
 
-  // The Undo toast disappears by itself after a few seconds.
+  // The toast disappears by itself after a few seconds.
   useEffect(() => {
-    if (!undo) return
-    const timer = setTimeout(() => setUndo(null), UNDO_MS)
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), TOAST_MS)
     return () => clearTimeout(timer)
-  }, [undo])
+  }, [toast])
 
   // A mirror of the two lists that incoming changes need. Reading them
   // through a ref means the sync below doesn't have to restart every time
@@ -651,19 +669,104 @@ function App() {
     if (index === -1) return
     const task = tasks[index]
     setTasks(tasks.filter((item) => item.id !== id))
-    setUndo({ message: `Dropped ${task.title}.`, task: task, index: index })
+    setToast({
+      message: `Dropped ${task.title}.`,
+      actionLabel: 'Undo',
+      // Puts it back where it was, unless it somehow came back already.
+      onAction: () => {
+        setTasks((current) => {
+          if (current.some((item) => item.id === task.id)) return current
+          const next = [...current]
+          next.splice(Math.min(index, next.length), 0, task)
+          return next
+        })
+        setToast(null)
+      },
+    })
   }
 
-  function undoDrop() {
-    if (!undo) return
-    const { task, index } = undo
-    setTasks((current) => {
-      if (current.some((item) => item.id === task.id)) return current
-      const next = [...current]
-      next.splice(Math.min(index, next.length), 0, task)
-      return next
+  // ---- The timer (Phase 13) ----
+
+  // Every timer change goes through here: keep the new timer and entries,
+  // and say so when a too-short run was thrown away.
+  function applyTimer(result) {
+    setActiveTimer(result.state.activeTimer)
+    setEntries(result.state.entries)
+    if (result.discarded) {
+      setToast({ message: 'Under a minute, so it wasn’t saved.' })
+    }
+  }
+
+  function startTask(task) {
+    applyTimer(startTimer({ activeTimer: activeTimer, entries: entries }, timerFor(task)))
+  }
+
+  function stopRunning() {
+    applyTimer(stopTimer({ activeTimer: activeTimer, entries: entries }))
+  }
+
+  // Restarts whatever was tracked most recently.
+  function resumeLast() {
+    const last = lastEntry(entries)
+    if (!last) return
+    applyTimer(startTimer({ activeTimer: activeTimer, entries: entries }, last))
+  }
+
+  function logTaskAsPlanned(task) {
+    setEntries([...entries, logAsPlanned(task)])
+  }
+
+  // Saves the Log time form: a new entry, or changes to one.
+  function saveEntry(details) {
+    const area = areas.find((item) => item.id === details.areaId) ?? null
+    const editing = logForm?.entryId
+      ? entries.find((entry) => entry.id === logForm.entryId)
+      : null
+
+    const entry = {
+      id: editing?.id ?? `e_${makeId()}`,
+      taskId: editing?.taskId ?? null,
+      areaId: details.areaId,
+      // The category is copied in now, so the entry still counts if its
+      // Area or task goes away later.
+      categoryId: area?.categoryId ?? editing?.categoryId ?? DEFAULT_CATEGORY_ID,
+      label: details.label || area?.name || 'Time',
+      start: details.start,
+      end: details.end,
+      source: editing?.source ?? 'manual',
+    }
+
+    setEntries(
+      editing
+        ? entries.map((item) => (item.id === editing.id ? entry : item))
+        : [...entries, entry],
+    )
+    setLogForm(null)
+  }
+
+  // Deleting an entry, with a few seconds to change your mind.
+  function deleteEntry(id) {
+    const entry = entries.find((item) => item.id === id)
+    if (!entry) return
+    setEntries(entries.filter((item) => item.id !== id))
+    setToast({
+      message: `Deleted ${entry.label}.`,
+      actionLabel: 'Undo',
+      onAction: () => {
+        setEntries((current) =>
+          current.some((item) => item.id === entry.id) ? current : [...current, entry],
+        )
+        setToast(null)
+      },
     })
-    setUndo(null)
+  }
+
+  // What every task row needs to know about the timer.
+  const timerActions = {
+    runningTaskId: activeTimer?.taskId ?? null,
+    onStart: startTask,
+    canLogAsPlanned: (task) => canLogAsPlanned(task, entries),
+    onLogAsPlanned: logTaskAsPlanned,
   }
 
   // The answer to the morning question. Either way, it's not asked again
@@ -758,6 +861,27 @@ function App() {
           Repeats
         </Button>
       </header>
+
+      {/* Sticky: what's running stays in view on every screen. */}
+      <NowBar
+        timer={activeTimer}
+        last={lastEntry(entries)}
+        onStop={stopRunning}
+        onResume={resumeLast}
+        onLogTime={() => setLogForm({})}
+      />
+
+      {logForm && (
+        <LogTimeForm
+          // A new key for each entry, so the form starts fresh each time.
+          key={logForm.entryId ?? 'new'}
+          entry={entries.find((entry) => entry.id === logForm.entryId) ?? null}
+          areas={areas}
+          defaultDay={tab === 'day' ? selectedDay : today}
+          onSave={saveEntry}
+          onCancel={() => setLogForm(null)}
+        />
+      )}
 
       <AccountBar
         isConfigured={isConfigured}
@@ -872,14 +996,24 @@ function App() {
               onUpdateTask={updateTask}
               onToggleTask={toggleTask}
               onDeleteTask={deleteTask}
+              timer={timerActions}
             />
           ))}
+
+          <TimeLog
+            entries={entriesOn(selectedDay, entries)}
+            areas={areas}
+            onAdd={() => setLogForm({})}
+            onEdit={(entryId) => setLogForm({ entryId: entryId })}
+            onDelete={deleteEntry}
+          />
 
           <ToPlaceSection
             tasks={toPlace}
             areas={areas}
             allTasks={tasks}
             today={today}
+            timer={timerActions}
             onUpdateTask={updateTask}
             onToggleTask={toggleTask}
             onDeleteTask={deleteTask}
@@ -903,6 +1037,7 @@ function App() {
           away={away}
           conflicts={conflicts}
           toPlace={toPlace}
+          timer={timerActions}
           onShiftWeek={(amount) => setWeekDay(addDays(weekDay, amount * 7))}
           onThisWeek={() => setWeekDay(today)}
           onOpenDay={openDay}
@@ -917,7 +1052,9 @@ function App() {
         />
       )}
 
-      {undo && <UndoToast message={undo.message} onUndo={undoDrop} />}
+      {toast && (
+        <Toast message={toast.message} actionLabel={toast.actionLabel} onAction={toast.onAction} />
+      )}
     </main>
   )
 }

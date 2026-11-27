@@ -199,3 +199,32 @@
 - [x] Unfinished work comes back as "pushed 1×" after saying yes in the morning
 - [x] `npm run check` passes: 265 tests
 - [ ] Merged via PR, tagged v2.2
+
+
+## Phase 13: Timer and time log (v2.3)
+
+**Date:** 2026-11-27
+
+**What I did**
+- `timer.js`: one timer. `startTimer` stops whatever ran first and saves it, and `stopTimer` saves exactly one entry. Under a minute is thrown away, and the app says so. Also `logAsPlanned`, `isLogged`, the clock format, and the check for hand-logged entries
+- The Now bar, sticky on every screen: the running label with its colour dot, a clock counting every second (HH:MM:SS), and Stop. With nothing running: Resume last and Log time
+- ▶ Start on every task, on the Day screen, the Week screen and To place. The running one says "running"
+- Log as planned on a block that's over with nothing logged. Once logged, it isn't offered again
+- Log time by hand (what, Area, day, from, to; an end before the start means past midnight), and editing an entry with the same form
+- The Time log on the Day screen: the day's entries with their total, plus edit, and delete with Undo
+- The toast is now general: an Undo after Drop or deleting an entry, or just a message
+- The timer and entries were already saved locally and in the cloud since Phase 11, so a running timer survives closing the app
+
+**What broke and how I fixed it**
+- (fill in)
+- Lint caught `setNow()` called straight inside an effect. It wasn't needed: the clock already reads 00:00:00 for the second before its first tick
+
+**Learned**
+- (fill in)
+
+**Checklist**
+- [x] A running timer survives a reload
+- [x] Every stop makes exactly one entry; under a minute makes none
+- [x] Log as planned is only offered once
+- [x] `npm run check` passes: 290 tests
+- [ ] Merged via PR, tagged v2.3

@@ -20,6 +20,7 @@ import { findArea } from '../lib/areas.js'
 function CategorySection({
   category,
   areas = [],
+  timer = null,
   tasks,
   allTasks,
   conflicts,
@@ -105,6 +106,7 @@ function CategorySection({
                     key={task.id}
                     task={task}
                     area={findArea(areas, task.areaId)}
+                    timer={timer}
                     conflicts={conflicts[task.id] ?? []}
                     onToggle={onToggleTask}
                     onEdit={setEditingId}
