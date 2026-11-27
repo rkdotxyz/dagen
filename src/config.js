@@ -39,3 +39,28 @@ export function getCategory(id) {
   // ?? means "if the left side is null or undefined, use the right side".
   return found ?? CATEGORIES.find((category) => category.id === DEFAULT_CATEGORY_ID)
 }
+
+// ---- Planning (Phase 12) ----
+//
+// How a deadline turns into a "start by" day: Dagen assumes about this
+// many hours a day go on one task, plus this many days of buffer. A 5h
+// task due Friday: ceil(5 / 2) = 3 days of work + 1 spare = start Monday.
+export const HOURS_PER_DAY_ON_TASK = 2
+export const START_BUFFER_DAYS = 1
+
+// How many times a task can be pushed back before Dagen suggests
+// halving or dropping it.
+export const PUSHED_LIMIT = 3
+
+// The most priorities shown for a week. More than five isn't a priority.
+export const MAX_PRIORITIES = 5
+
+// The screens, in tab-bar order. "ready" turns a tab on as its phase
+// arrives; until then it's shown, switched off, as "coming soon".
+export const TABS = [
+  { id: 'day', name: 'Day', ready: true },
+  { id: 'week', name: 'Week', ready: true },
+  { id: 'month', name: 'Month', ready: false },
+  { id: 'quarter', name: 'Quarter', ready: false },
+  { id: 'insights', name: 'Insights', ready: false },
+]

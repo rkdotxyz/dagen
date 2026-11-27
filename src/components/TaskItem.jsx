@@ -10,7 +10,9 @@
 
   It still changes nothing itself. It reports taps upwards and draws what
   it's given. The row is a shadcn/ui Card with a Checkbox and two icon
-  Buttons.
+  Buttons. Since Phase 12 it also shows the marks from TaskMarks.jsx:
+  a lock for fixed events, a star for priorities, and deadline and
+  "pushed" pills.
 */
 
 import { PencilIcon, XIcon } from 'lucide-react'
@@ -18,8 +20,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { formatDay, formatDuration, formatRange } from '../lib/dates.js'
+import { formatDay, formatDuration, formatRange, todayISO } from '../lib/dates.js'
 import { dayOf, placementOf } from '../lib/placement.js'
+import { TaskPills, TitleIcons } from './TaskMarks.jsx'
 
 // The "when" line, in words.
 function describeWhen(task) {
@@ -33,7 +36,21 @@ function describeWhen(task) {
   return `Not placed · ${formatDuration(task.durationMin)}`
 }
 
-function TaskItem({ task, area = null, conflicts, onToggle, onEdit, onDelete }) {
+// "extra" is anything a list wants under the row: the To place list puts
+// its "Place on…", "Halve it" and "Drop" there. "draggable" and
+// "onDragStart" let a row be dragged on a computer (see WeekView).
+function TaskItem({
+  task,
+  area = null,
+  conflicts,
+  today = todayISO(),
+  extra = null,
+  draggable = false,
+  onDragStart,
+  onToggle,
+  onEdit,
+  onDelete,
+}) {
   const isDone = task.status === 'done'
 
   // The row's state as class names. The CSS uses "clash" for an amber
@@ -42,16 +59,22 @@ function TaskItem({ task, area = null, conflicts, onToggle, onEdit, onDelete }) 
     'task',
     isDone && 'done',
     task.tentative && 'tentative',
+    task.fixed && 'is-fixed',
     conflicts.length > 0 && 'clash',
   ]
     .filter(Boolean)
     .join(' ')
 
   return (
-    <li className={classNames}>
-      {/* The utility classes reshape shadcn's Card from a column into a
-          single row; cn() inside Card lets these win over its defaults. */}
-      <Card className="task-card flex-row items-center gap-2 px-3 py-2.5">
+    <li
+      className={classNames}
+      draggable={draggable || undefined}
+      onDragStart={draggable ? (event) => onDragStart(event, task) : undefined}
+    >
+      {/* The utility classes tighten shadcn's Card; cn() inside Card lets
+          these win over its defaults. */}
+      <Card className="task-card gap-2 px-3 py-2.5">
+        <div className="task-row">
         <label className="task-main">
           <Checkbox checked={isDone} onCheckedChange={() => onToggle(task.id)} />
 
@@ -65,6 +88,7 @@ function TaskItem({ task, area = null, conflicts, onToggle, onEdit, onDelete }) 
                   ~
                 </Badge>
               )}
+              <TitleIcons task={task} />
               {task.title}
             </span>
 
@@ -77,6 +101,8 @@ function TaskItem({ task, area = null, conflicts, onToggle, onEdit, onDelete }) 
                 </span>
               )}
             </span>
+
+            <TaskPills task={task} today={today} />
 
             {conflicts.length > 0 && (
               <span className="clash-note">
@@ -112,6 +138,9 @@ function TaskItem({ task, area = null, conflicts, onToggle, onEdit, onDelete }) 
         >
           <XIcon />
         </Button>
+        </div>
+
+        {extra}
       </Card>
     </li>
   )

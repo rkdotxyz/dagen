@@ -2,18 +2,23 @@
   TemplatePanel.jsx — the list of recurring chores, and the form to add one.
 
   A template is a rule: what, where, how often, when and for how long.
+  Since Phase 12 a rule can also make FIXED events ("KTH lecture, Tue
+  10:00"), which take capacity first, and can belong to an Area.
   Nothing here knows how the rules turn into tasks; that's recurring.js.
 
   The whole panel is a shadcn/ui Card, with its Input, NativeSelect and
   Button inside.
 */
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
+import { Switch } from '@/components/ui/switch'
+import { findArea, liveAreas } from '../lib/areas.js'
 import { CATEGORIES, getCategory } from '../config.js'
 import { DURATIONS, QUARTER_TIMES, WEEKDAY_NAMES, formatDuration } from '../lib/dates.js'
 
@@ -22,25 +27,34 @@ function describe(template) {
   const when =
     template.repeat === 'daily' ? 'Daily' : `Every ${WEEKDAY_NAMES[template.weekday]}`
 
-  return `${when} at ${template.time} · ${formatDuration(template.durationMin)}`
+  const fixed = template.fixed ? ' · fixed' : ''
+  return `${when} at ${template.time} · ${formatDuration(template.durationMin)}${fixed}`
 }
 
-function TemplatePanel({ templates, onAdd, onDelete }) {
+function TemplatePanel({ templates, areas = [], onAdd, onDelete }) {
   const [title, setTitle] = useState('')
   const [categoryId, setCategoryId] = useState(CATEGORIES[0].id)
   const [repeat, setRepeat] = useState('daily')
   const [weekday, setWeekday] = useState(0)
   const [time, setTime] = useState('18:00')
   const [durationMin, setDurationMin] = useState(30)
+  const [fixed, setFixed] = useState(false)
+  const [areaId, setAreaId] = useState('')
+  const fixedId = useId()
 
   function handleSubmit(event) {
     event.preventDefault()
     const trimmed = title.trim()
     if (trimmed === '') return
 
+    const area = findArea(areas, areaId)
+
     onAdd({
       title: trimmed,
-      categoryId: categoryId,
+      // As in the task form, an Area decides the category.
+      categoryId: area ? area.categoryId : categoryId,
+      areaId: area ? area.id : null,
+      fixed: fixed,
       repeat: repeat,
       // Number(...) because a <select> always hands back text, even "0".
       weekday: Number(weekday),
@@ -166,6 +180,29 @@ function TemplatePanel({ templates, onAdd, onDelete }) {
                 {formatDuration(option)}
               </Button>
             ))}
+          </div>
+
+          <div className="form-row">
+            {liveAreas(areas).length > 0 && (
+              <NativeSelect
+                className="field"
+                value={areaId}
+                onChange={(event) => setAreaId(event.target.value)}
+                aria-label="Chore Area"
+              >
+                <option value="">No Area</option>
+                {liveAreas(areas).map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
+
+            <div className="tentative-toggle">
+              <Switch id={fixedId} checked={fixed} onCheckedChange={setFixed} />
+              <Label htmlFor={fixedId}>Fixed event</Label>
+            </div>
           </div>
 
           <div className="form-row">

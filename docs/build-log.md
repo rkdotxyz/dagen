@@ -167,3 +167,35 @@
 - [x] No test needed changing: they find things by label and role, not by look
 - [x] Works at 360px, light and dark
 - [ ] Merged via PR
+
+
+## Phase 12: Week view, To place, rollover, deadlines (v2.2)
+
+**Date:** 2026-11-27
+
+**What I did**
+- `capacity.js`: free hours = base − fixed − planned. Fixed time is merged so overlaps count once. Away days have zero. Week and month totals list the overpacked days
+- `deadlines.js`: a start-by day from the deadline and estimate (2h a day + 1 day buffer, in `config.js`), and the states overdue / start now / upcoming
+- `rollover.js` as a **morning prompt** (my choice): "2 tasks didn't happen. Move them to To place?" Only on a yes do they move, with "pushed N×". Fixed, done and recurring tasks never roll over. "Not now" waits until tomorrow
+- `planning.js`: the week's priorities (5 at most), the To place order, Halve it, and the headline sentences
+- Tabs (Day, Week; Month, Quarter, Insights shown as coming soon) at the bottom on a phone and the top from 900px, kept in the address (`#week`) and remembered
+- The Week screen: "Week 48 has 6h of slack" or "Thursday is overpacked", dates · fixed · planned · clashes, seven days (stacked on a phone, columns on a computer), fixed things with a lock and a solid band, a "now" line, away days covered, tap to edit
+- Priorities this week, and To place with deadline pills, "Place on…", and Halve it / Drop (with Undo) once a task is pushed 3 times
+- Drag on a computer: from To place onto a day (any time, or its old time), between days, and back to To place
+- The Day screen states its finding ("Friday · 3h free" / "overpacked by 0.5h") with a fixed / planned / free bar
+- The task form: Task or Fixed event, a deadline, Priority, and messages instead of silently doing nothing. Repeats can make fixed events with an Area
+- Busy calendars are fetched a week at a time, cached in memory, and count as fixed time
+
+**What broke and how I fixed it**
+- (fill in)
+- Fixed items in the Week view floated out of their cards: the class name `fixed` is also Tailwind's `position: fixed`. Renamed to `is-fixed`
+- The fifth tab didn't fit on a phone: a shadcn Button's padding is a Tailwind class, which beats a stylesheet rule. Set the sizes as Tailwind classes on the tab instead
+
+**Learned**
+- (fill in)
+
+**Checklist**
+- [x] Plan a week and see which days are overpacked, busy calendars included
+- [x] Unfinished work comes back as "pushed 1×" after saying yes in the morning
+- [x] `npm run check` passes: 265 tests
+- [ ] Merged via PR, tagged v2.2

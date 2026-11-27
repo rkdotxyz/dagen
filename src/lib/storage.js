@@ -228,3 +228,44 @@ export function loadSettings() {
 export function saveSettings(settings) {
   saveValue(SETTINGS_KEY, settings)
 }
+
+// ---- Phase 12: small things the screens remember ----
+
+const TAB_KEY = 'dagen.tab.v1'
+const ROLLOVER_ASKED_KEY = 'dagen.rolloverAsked.v1'
+
+// The last screen you were on, so the installed app reopens there even
+// when it starts without "#week" in its address.
+export function loadTab() {
+  try {
+    return localStorage.getItem(TAB_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function saveTab(tab) {
+  try {
+    localStorage.setItem(TAB_KEY, tab)
+  } catch {
+    // Then it opens on Day next time. Harmless.
+  }
+}
+
+// The day you last answered the rollover question ("Move them" or "Not
+// now"), so it's asked at most once a day.
+export function loadRolloverAsked() {
+  try {
+    return localStorage.getItem(ROLLOVER_ASKED_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function saveRolloverAsked(day) {
+  try {
+    localStorage.setItem(ROLLOVER_ASKED_KEY, day)
+  } catch {
+    // Then it may ask again today. Harmless.
+  }
+}

@@ -137,6 +137,23 @@ export async function listDayEvents(token, calendarId, day) {
   return data?.items ?? []
 }
 
+// Everything booked in one calendar over a run of days, from the start
+// of "fromDay" to the end of the day before "untilDay". Since Phase 12
+// Dagen asks for a whole week at once: busy events now take capacity,
+// and the Week screen needs all seven days.
+export async function listRangeEvents(token, calendarId, fromDay, untilDay) {
+  const params = new URLSearchParams({
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '250',
+    timeMin: new Date(`${fromDay}T00:00:00`).toISOString(),
+    timeMax: new Date(`${untilDay}T00:00:00`).toISOString(),
+  })
+
+  const data = await request(token, `${eventsUrl(calendarId)}?${params}`)
+  return data?.items ?? []
+}
+
 // The calendars you can see, so you can choose which ones count as busy.
 export async function listCalendars(token) {
   const data = await request(

@@ -377,13 +377,12 @@
     margin-bottom: 0.5rem;
   }
 
-  /* The card holds the whole row: tick, text, then two buttons. */
-  .task-card {
+  /* The card holds the row (tick, text, two buttons) and, in To place,
+     the controls under it. */
+  .task-row {
     display: flex;
-    flex-direction: row;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.6rem 0.75rem;
   }
 
   .task-main {
@@ -557,5 +556,420 @@
 
   .to-place {
     margin-top: 1.5rem;
+  }
+
+  /* ---------- Phase 12: tabs, headlines, capacity ---------- */
+
+  /* The Week screen gets the room it needs on a computer. */
+  .app.wide {
+    max-width: 90rem;
+  }
+
+  /* On a phone the tabs sit at the bottom, in reach of a thumb. The page
+     gets matching room at the bottom so nothing hides behind them. */
+  .tab-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: space-around;
+    gap: 0.25rem;
+    padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom));
+    background: var(--background);
+    border-top: 1px solid var(--border);
+  }
+
+  .app {
+    padding-bottom: 6rem;
+  }
+
+  /* From 900px the tabs move to the top, as an ordinary row. */
+  @media (min-width: 900px) {
+    .tab-bar {
+      position: static;
+      justify-content: flex-start;
+      padding: 0;
+      margin: 0 0 1rem;
+      border-top: 0;
+    }
+
+    .app {
+      padding-bottom: 4rem;
+    }
+  }
+
+  /* The sentence that states the finding, at the top of a screen. */
+  .headline {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.25rem;
+  }
+
+  .subline {
+    margin: 0;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+  }
+
+  .capacity {
+    margin-bottom: 1.25rem;
+  }
+
+  /* Fixed time is hatched, planned work is solid, free is the empty
+     rest. Hatching means fixed reads differently without colour. */
+  .capacity-bar {
+    display: flex;
+    height: 0.75rem;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--muted);
+    margin: 0.4rem 0;
+  }
+
+  .capacity-fixed {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--foreground) 0 3px,
+      transparent 3px 6px
+    );
+    opacity: 0.55;
+  }
+
+  .capacity-planned {
+    background: var(--primary);
+  }
+
+  .capacity-bar.over .capacity-planned {
+    background: var(--warn);
+  }
+
+  .capacity-legend {
+    margin: 0;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+  }
+
+  /* The morning question. */
+  .rollover-prompt {
+    margin-bottom: 1rem;
+    border-color: var(--warn);
+  }
+
+  .rollover-content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+
+  .rollover-text {
+    margin: 0;
+  }
+
+  /* "Dropped X. Undo", floating above the tab bar. */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 5rem;
+    z-index: 20;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.5rem 0.5rem 0.5rem 1rem;
+    border-radius: var(--radius-lg);
+    background: var(--foreground);
+    color: var(--background);
+    font-size: 0.875rem;
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+  }
+
+  @media (min-width: 900px) {
+    .toast {
+      bottom: 1.5rem;
+    }
+  }
+
+  /* ---------- Marks on tasks ---------- */
+
+  .title-icon {
+    display: inline-block;
+    width: 0.85rem;
+    height: 0.85rem;
+    margin-right: 0.3rem;
+    vertical-align: -0.1rem;
+    flex-shrink: 0;
+  }
+
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
+  }
+
+  .pill-warn {
+    border-color: var(--warn);
+    color: var(--warn);
+  }
+
+  /* A fixed task in a list gets a solid edge on its left. The class is
+     "is-fixed", not "fixed": Tailwind already has a "fixed" class
+     (position: fixed), and it would win. */
+  .task.is-fixed .task-card {
+    border-left: 4px solid var(--foreground);
+  }
+
+  /* ---------- To place ---------- */
+
+  .to-place-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding-left: 1.75rem; /* lines up with the title, past the tick */
+  }
+
+  .to-place-actions .place-on {
+    width: auto;
+    min-width: 9rem;
+  }
+
+  /* Somewhere a dragged task can be dropped. */
+  .drag-over {
+    outline: 2px dashed var(--ring);
+    outline-offset: 4px;
+  }
+
+  [draggable='true'] {
+    cursor: grab;
+  }
+
+  .form-end {
+    justify-content: flex-end;
+  }
+
+  /* ---------- The Week screen ---------- */
+
+  .view-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .view-nav {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  /* Phone: days stacked, then priorities and To place below them. */
+  .week-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .week-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .week-side {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /* Computer: seven columns side by side, with the panel on the right.
+     The columns scroll sideways inside .week-scroll if the window is too
+     narrow, never the whole page. */
+  @media (min-width: 900px) {
+    .week-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 18rem;
+      align-items: start;
+    }
+
+    .week-scroll {
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    .week-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(8.5rem, 1fr));
+      align-items: start;
+      gap: 0.5rem;
+    }
+
+    .week-side .to-place {
+      margin-top: 0;
+    }
+  }
+
+  .day-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .day-card-name {
+    white-space: nowrap;
+    font: inherit;
+    font-weight: 600;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--foreground);
+    cursor: pointer;
+    min-height: 32px;
+  }
+
+  .day-card.today .day-card-name {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .day-card-free {
+    color: var(--muted-foreground);
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .day-card.over {
+    border-color: var(--warn);
+  }
+
+  /* Away: the lid is on. Hatched, like fixed time, because it is. */
+  .day-card.away {
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--muted) 0 6px,
+      transparent 6px 12px
+    );
+  }
+
+  .away-note {
+    margin: 0;
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+
+  .week-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .week-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .week-item [data-slot='checkbox'] {
+    margin-top: 0.15rem;
+  }
+
+  /* Fixed things: a solid band on the left and a faint hatch, so they
+     differ from flexible work without relying on colour. */
+  .week-item.is-fixed {
+    border-left: 4px solid var(--foreground);
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--muted) 0 4px,
+      transparent 4px 8px
+    );
+  }
+
+  .week-item.done {
+    opacity: 0.55;
+  }
+
+  .week-item.done .week-item-title {
+    text-decoration: line-through;
+  }
+
+  .week-item.clash {
+    border-color: var(--warn);
+  }
+
+  .week-item-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font: inherit;
+    text-align: left;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--foreground);
+  }
+
+  button.week-item-text {
+    cursor: pointer;
+  }
+
+  .week-item-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  /* The thin "now" line on today. */
+  .now-line {
+    height: 2px;
+    margin: 0.1rem 0;
+    border-radius: 2px;
+    background: var(--destructive);
+  }
+
+  .week-edit {
+    list-style: none;
+  }
+
+  .side-card .empty {
+    margin: 0;
+  }
+
+  .priority-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .priority {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .priority-text {
+    flex: 1;
+    min-width: 8rem;
+    display: flex;
+    flex-direction: column;
   }
 }
