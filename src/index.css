@@ -972,4 +972,76 @@
     display: flex;
     flex-direction: column;
   }
+
+  /* ---------- Phase 13: the Now bar and time log ---------- */
+
+  /* Stays at the top of the screen as you scroll, on every screen. */
+  .now-bar {
+    position: sticky;
+    top: 0;
+    z-index: 9;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    margin: 0 -1rem 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--background);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .now-bar.running {
+    border-bottom-color: var(--primary);
+  }
+
+  .now-label {
+    flex: 1;
+    min-width: 6rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .now-label.muted {
+    font-weight: 400;
+    color: var(--muted-foreground);
+  }
+
+  /* On a narrow phone the two buttons say enough; the words would push
+     them onto a second line. */
+  @media (max-width: 420px) {
+    .now-label.muted {
+      display: none;
+    }
+
+    .now-bar:not(.running) {
+      justify-content: flex-end;
+    }
+  }
+
+  /* Tabular digits: every digit is the same width, so the clock doesn't
+     jiggle as it counts. */
+  .now-clock {
+    font-variant-numeric: tabular-nums;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .running-badge {
+    flex-shrink: 0;
+  }
+
+  .log-form {
+    margin-bottom: 1rem;
+  }
+
+  .time-log {
+    margin-top: 1.5rem;
+  }
+
+  .time-log .category-header {
+    justify-content: space-between;
+  }
 }

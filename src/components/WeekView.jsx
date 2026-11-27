@@ -22,7 +22,8 @@
 */
 
 import { useState } from 'react'
-import { ChevronLeftIcon, ChevronRightIcon, LockIcon, StarIcon } from 'lucide-react'
+import { ChevronLeftIcon, ChevronRightIcon, LockIcon, PlayIcon, StarIcon } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -63,7 +64,7 @@ function nowIndex(items, nowMinutes) {
 }
 
 // One thing on a day: a task you can tick and edit, or a busy event.
-function WeekItem({ item, area, conflicts, today, onToggle, onEdit, onDragStart }) {
+function WeekItem({ item, area, conflicts, today, timer, onToggle, onEdit, onDragStart }) {
   const isBusy = Boolean(item.external)
   const isDone = item.status === 'done'
   const when = item.start ? formatRange(item.start, item.durationMin) : 'any time'
@@ -120,6 +121,25 @@ function WeekItem({ item, area, conflicts, today, onToggle, onEdit, onDragStart 
           <TaskPills task={item} today={today} />
         </button>
       )}
+
+      {/* ▶ starts this task's timer (Phase 13). */}
+      {!isBusy &&
+        timer &&
+        (timer.runningTaskId === item.id ? (
+          <Badge className="running-badge">running</Badge>
+        ) : (
+          !isDone && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={() => timer.onStart(item)}
+              aria-label={`Start ${item.title}`}
+            >
+              <PlayIcon />
+            </Button>
+          )
+        ))}
     </li>
   )
 }
@@ -132,6 +152,7 @@ function DayCard({
   areas,
   allTasks,
   conflicts,
+  timer,
   editingId,
   onEdit,
   onStopEditing,
@@ -225,6 +246,7 @@ function DayCard({
                   area={findArea(areas, item.areaId)}
                   conflicts={conflicts[item.id] ?? []}
                   today={today}
+                  timer={timer}
                   onToggle={onToggleTask}
                   onEdit={onEdit}
                   onDragStart={onDragStart}
@@ -287,6 +309,7 @@ function WeekView({
   away,
   conflicts,
   toPlace,
+  timer,
   onShiftWeek,
   onThisWeek,
   onOpenDay,
@@ -351,6 +374,7 @@ function WeekView({
                 areas={areas}
                 allTasks={[...tasks, ...busy]}
                 conflicts={conflicts}
+                timer={timer}
                 editingId={editingId}
                 onEdit={setEditingId}
                 onStopEditing={() => setEditingId(null)}
@@ -372,6 +396,7 @@ function WeekView({
             areas={areas}
             allTasks={[...tasks, ...busy]}
             today={today}
+            timer={timer}
             onUpdateTask={onUpdateTask}
             onToggleTask={onToggleTask}
             onDeleteTask={onDeleteTask}
