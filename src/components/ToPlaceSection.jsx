@@ -12,7 +12,7 @@
 */
 
 import { useState } from 'react'
-import { DrawablyBadge, DrawablyDivider } from 'drawably/react'
+import { Badge } from '@/components/ui/badge'
 import { getCategory } from '../config.js'
 import { findArea } from '../lib/areas.js'
 import TaskForm from './TaskForm.jsx'
@@ -33,11 +33,9 @@ function ToPlaceSection({
       <div className="category-header">
         <h2 className="section-title">
           To place
-          <DrawablyBadge className="category-count">{tasks.length}</DrawablyBadge>
+          <Badge variant="secondary">{tasks.length}</Badge>
         </h2>
       </div>
-
-      <DrawablyDivider className="category-rule" />
 
       {tasks.length === 0 ? (
         <p className="empty">

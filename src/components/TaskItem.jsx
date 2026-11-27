@@ -9,17 +9,15 @@
   and a task's Area follows it, greyed out if that Area was archived.
 
   It still changes nothing itself. It reports taps upwards and draws what
-  it's given. Since Phase 10 the row is a sketched card, and the controls
-  inside it are drawably's: real inputs and buttons underneath, with a pen
-  drawing layered behind them.
+  it's given. The row is a shadcn/ui Card with a Checkbox and two icon
+  Buttons.
 */
 
-import {
-  DrawablyBadge,
-  DrawablyButton,
-  DrawablyCard,
-  DrawablyCheckbox,
-} from 'drawably/react'
+import { PencilIcon, XIcon } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { formatDay, formatDuration, formatRange } from '../lib/dates.js'
 import { dayOf, placementOf } from '../lib/placement.js'
 
@@ -38,8 +36,8 @@ function describeWhen(task) {
 function TaskItem({ task, area = null, conflicts, onToggle, onEdit, onDelete }) {
   const isDone = task.status === 'done'
 
-  // The row's state as class names. The CSS uses "clash" and "done" to
-  // change the pen colour of everything drawn inside the row.
+  // The row's state as class names. The CSS uses "clash" for an amber
+  // edge and "done" to fade the row and strike through its title.
   const classNames = [
     'task',
     isDone && 'done',
@@ -51,18 +49,22 @@ function TaskItem({ task, area = null, conflicts, onToggle, onEdit, onDelete }) 
 
   return (
     <li className={classNames}>
-      <DrawablyCard className="task-card">
+      {/* The utility classes reshape shadcn's Card from a column into a
+          single row; cn() inside Card lets these win over its defaults. */}
+      <Card className="task-card flex-row items-center gap-2 px-3 py-2.5">
         <label className="task-main">
-          <DrawablyCheckbox checked={isDone} onChange={() => onToggle(task.id)} />
+          <Checkbox checked={isDone} onCheckedChange={() => onToggle(task.id)} />
 
           <span className="task-text">
             <span className="task-title">
-              {/* The tilde marks a time that may still move, now in a
-                  little sketched tag. Google gets the same mark. */}
-              {/* The gap after the tag comes from CSS (.tilde), not a
-                  space character: a space here would end up in the title's
-                  text for every task, tentative or not. */}
-              {task.tentative && <DrawablyBadge className="tilde">~</DrawablyBadge>}
+              {/* The tilde marks a time that may still move. Google gets
+                  the same mark. The gap after it comes from CSS (.tilde),
+                  not a space: a space would end up in every title's text. */}
+              {task.tentative && (
+                <Badge variant="outline" className="tilde">
+                  ~
+                </Badge>
+              )}
               {task.title}
             </span>
 
@@ -90,26 +92,27 @@ function TaskItem({ task, area = null, conflicts, onToggle, onEdit, onDelete }) 
           </span>
         </label>
 
-        {/* Words instead of symbols: the pen font draws letters, and has
-            no pencil or multiplication sign. The aria-labels are what
-            screen readers (and the tests) use, and they haven't changed. */}
-        <DrawablyButton
-          className="row-button"
+        {/* Icon-only buttons. The aria-labels are what screen readers (and
+            the tests) use, so they say exactly what each one does. */}
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => onEdit(task.id)}
           aria-label={`Edit ${task.title}`}
         >
-          edit
-        </DrawablyButton>
+          <PencilIcon />
+        </Button>
 
-        <DrawablyButton
-          className="row-button"
-          tone="danger"
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-destructive hover:text-destructive"
           onClick={() => onDelete(task.id)}
           aria-label={`Delete ${task.title}`}
         >
-          x
-        </DrawablyButton>
-      </DrawablyCard>
+          <XIcon />
+        </Button>
+      </Card>
     </li>
   )
 }

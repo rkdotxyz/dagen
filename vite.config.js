@@ -1,16 +1,30 @@
 /*
   vite.config.js — settings for Vite (dev server and builder), Vitest
-  (the test runner) and, from this phase, the PWA plugin that makes Dagen
-  installable on a phone's home screen.
+  (the test runner), the PWA plugin that makes Dagen installable on a
+  phone's home screen, and Tailwind CSS, which shadcn/ui is styled with.
 */
 
+import { fileURLToPath, URL } from 'node:url'
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // "@/components/ui/button" means "src/components/ui/button". shadcn's
+  // components are written with this shortcut, so Vite needs to know it.
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+
   plugins: [
     react(),
+
+    // Reads the class names in the components and writes just the CSS
+    // they use.
+    tailwindcss(),
 
     VitePWA({
       // When you push a new version, the installed app updates itself
@@ -26,8 +40,8 @@ export default defineConfig({
         start_url: '/',
         // standalone = opens without the browser's address bar, like an app.
         display: 'standalone',
-        background_color: '#151515',
-        theme_color: '#0b6e7f',
+        background_color: '#ffffff',
+        theme_color: '#ffffff',
         icons: [
           {
             src: 'icon.svg',
@@ -43,5 +57,7 @@ export default defineConfig({
 
   test: {
     environment: 'jsdom',
+    // Fills the gaps in the pretend browser before any test runs.
+    setupFiles: ['./src/test-setup.js'],
   },
 })

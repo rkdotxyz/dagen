@@ -2,12 +2,13 @@
   WeekStrip.jsx — the row of seven days at the top.
 
   It holds no state about the week: it draws what it's told and reports
-  taps upwards. Since Phase 10 the selected day gets a pen loop around its
-  number and today gets an underline, instead of a coloured block.
+  taps upwards. The selected day is filled in and today is underlined
+  (both in index.css). The arrows are shadcn/ui Buttons with icons.
 */
 
 import { useRef } from 'react'
-import { DrawablyButton, DrawablyCircle, DrawablyUnderline } from 'drawably/react'
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { dayNumber, formatDay, weekdayLetter } from '../lib/dates.js'
 
 function WeekStrip({
@@ -40,24 +41,31 @@ function WeekStrip({
       onTouchEnd={handleTouchEnd}
     >
       <div className="week-head">
-        {/* "prev" and "next" in words: the pen font has no arrow glyphs. */}
-        <DrawablyButton onClick={() => onShiftWeek(-1)} aria-label="Previous week">
-          prev
-        </DrawablyButton>
+        {/* Icon-only buttons: the aria-label is the name a screen reader
+            (and the tests) use. */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => onShiftWeek(-1)}
+          aria-label="Previous week"
+        >
+          <ChevronLeftIcon />
+        </Button>
 
         <span className="month-label">{monthLabel}</span>
 
-        <DrawablyButton onClick={() => onShiftWeek(1)} aria-label="Next week">
-          next
-        </DrawablyButton>
-
-        <DrawablyButton
-          className="today-button"
-          onClick={onToday}
-          aria-label="Go to today"
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => onShiftWeek(1)}
+          aria-label="Next week"
         >
+          <ChevronRightIcon />
+        </Button>
+
+        <Button variant="outline" onClick={onToday} aria-label="Go to today">
           Today
-        </DrawablyButton>
+        </Button>
       </div>
 
       <div className="week-days">
@@ -74,13 +82,6 @@ function WeekStrip({
             .filter(Boolean)
             .join(', ')
 
-          // The number, decorated: a loop for the selected day, a line
-          // under today, plain otherwise. A decoration is mounted fresh
-          // each time, so moving between days draws a new loop each time.
-          let number = dayNumber(day)
-          if (isSelected) number = <DrawablyCircle>{number}</DrawablyCircle>
-          else if (isToday) number = <DrawablyUnderline>{number}</DrawablyUnderline>
-
           return (
             <button
               key={day}
@@ -92,7 +93,7 @@ function WeekStrip({
               onClick={() => onSelect(day)}
             >
               <span className="day-letter">{weekdayLetter(day)}</span>
-              <span className="day-number">{number}</span>
+              <span className="day-number">{dayNumber(day)}</span>
               <span className="day-marks" aria-hidden="true">
                 {marker.hasConflict ? '!' : marker.count ? '.' : ''}
               </span>

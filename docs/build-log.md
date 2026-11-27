@@ -143,3 +143,27 @@
 - [x] Google never gets an event for an unplaced task
 - [x] `npm run check` passes: 205 tests
 - [ ] Merged via PR, tagged v2.1
+
+
+## Between 11 and 12: shadcn/ui instead of drawably
+
+**Date:** 2026-11-27
+
+**What I did**
+- Removed drawably (the hand-drawn controls and the blueprint theme)
+- Added Tailwind CSS and shadcn/ui. Its components live in `src/components/ui/` as our own code: Button, Card, Input, NativeSelect, Badge, Checkbox, Switch, Label
+- Neutral shadcn theme in `index.css`, light and dark following the system setting. Category colours stay as dots
+- Real icons (lucide) for the arrows, +, edit and delete buttons, with the same accessible names
+- `@/` path alias, `components.json` so `npx shadcn add <component>` works, and a test setup file for jsdom's missing ResizeObserver
+
+**What broke and how I fixed it**
+- (fill in)
+- Every test with a checkbox or switch failed with "ResizeObserver is not defined": Radix measures its controls and jsdom can't. Fixed with a do-nothing stand-in in `src/test-setup.js`
+
+**Learned**
+- (fill in)
+
+**Checklist**
+- [x] No test needed changing: they find things by label and role, not by look
+- [x] Works at 360px, light and dark
+- [ ] Merged via PR

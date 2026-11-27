@@ -7,9 +7,6 @@
   answer at a glance.
 */
 
-// Each link gets a pen underline, re-sketched whenever you hover it.
-import { DrawablyUnderline } from 'drawably/react'
-
 function AccountBar({ isConfigured, session, syncing, onSignIn, onSignOut }) {
   if (!isConfigured) {
     return <p className="account">Saved on this device only.</p>
@@ -20,7 +17,7 @@ function AccountBar({ isConfigured, session, syncing, onSignIn, onSignOut }) {
       <p className="account">
         Saved on this device only.{' '}
         <button type="button" className="link" onClick={onSignIn}>
-          <DrawablyUnderline>Sign in with Google</DrawablyUnderline>
+          Sign in with Google
         </button>{' '}
         to use Dagen on your phone too.
       </p>
@@ -34,7 +31,7 @@ function AccountBar({ isConfigured, session, syncing, onSignIn, onSignOut }) {
       <span>{session.user?.email}</span>
       {syncing && <span className="syncing"> · saving…</span>}{' '}
       <button type="button" className="link" onClick={onSignOut}>
-        <DrawablyUnderline>Sign out</DrawablyUnderline>
+        Sign out
       </button>
     </p>
   )
