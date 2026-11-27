@@ -122,24 +122,26 @@ function WeekItem({ item, area, conflicts, today, timer, onToggle, onEdit, onDra
         </button>
       )}
 
-      {/* ▶ starts this task's timer (Phase 13). */}
-      {!isBusy &&
-        timer &&
-        (timer.runningTaskId === item.id ? (
-          <Badge className="running-badge">running</Badge>
-        ) : (
-          !isDone && (
+      {/* ▶ starts this task's timer (Phase 13). It sits on its own line
+          under the title, so narrow columns keep their width for words. */}
+      {!isBusy && timer && (timer.runningTaskId === item.id || !isDone) && (
+        <div className="week-item-actions">
+          {timer.runningTaskId === item.id ? (
+            <Badge className="running-badge">running</Badge>
+          ) : (
             <Button
               variant="ghost"
-              size="icon"
-              className="size-8"
+              size="sm"
+              className="h-7 px-2"
               onClick={() => timer.onStart(item)}
               aria-label={`Start ${item.title}`}
             >
               <PlayIcon />
+              Start
             </Button>
-          )
-        ))}
+          )}
+        </div>
+      )}
     </li>
   )
 }

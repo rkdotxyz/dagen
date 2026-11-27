@@ -157,9 +157,12 @@
     margin: 0;
   }
 
-  /* The two panel buttons sit together on the right. The first one takes
-     all the spare room on its left, which pushes both across. */
-  .areas-button {
+  /* The panel buttons sit together on the right: the group takes all the
+     spare room on its left. When there's no room, the whole group wraps to
+     the next line. */
+  .header-actions {
+    display: flex;
+    gap: 0.5rem;
     margin-left: auto;
   }
 
@@ -874,10 +877,13 @@
     gap: 0.35rem;
   }
 
+  /* Tick and title on the first line; the Start button wraps onto its
+     own line underneath. */
   .week-item {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: 0.35rem 0.5rem;
     padding: 0.35rem 0.45rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -928,10 +934,18 @@
     cursor: pointer;
   }
 
+  /* break-word only splits a word that can't fit on a line by itself;
+     "anywhere" split ordinary words like "studio" in narrow columns. */
   .week-item-title {
     font-size: 0.875rem;
     font-weight: 500;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+  }
+
+  .week-item-actions {
+    flex-basis: 100%;
+    display: flex;
+    justify-content: flex-end;
   }
 
   /* The thin "now" line on today. */
@@ -1705,6 +1719,18 @@
   .switch-letter {
     font-size: 0.65rem;
     color: var(--muted-foreground);
+  }
+
+  /* ---------- Phase 17 ---------- */
+
+  .data-text {
+    max-height: 10rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+  }
+
+  .data-import {
+    margin-top: 0.75rem;
   }
 }
 

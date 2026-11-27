@@ -34,6 +34,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import AccountBar from './components/AccountBar.jsx'
+import AddPanel from './components/AddPanel.jsx'
 import AreasPanel from './components/AreasPanel.jsx'
 import CalendarBar from './components/CalendarBar.jsx'
 import CalendarPicker from './components/CalendarPicker.jsx'
@@ -47,6 +48,7 @@ import LogTimeForm from './components/LogTimeForm.jsx'
 import NowBar from './components/NowBar.jsx'
 import TimeLog from './components/TimeLog.jsx'
 import Toast from './components/Toast.jsx'
+import Welcome from './components/Welcome.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
 import InsightsView from './components/InsightsView.jsx'
 import MonthView from './components/MonthView.jsx'
@@ -56,10 +58,12 @@ import { CATEGORIES, DEFAULT_CATEGORY_ID, TABS, getCategory } from './config.js'
 import { createArea, removeArea, updateArea } from './lib/areas.js'
 import { toBusyBlocks } from './lib/busy.js'
 import { createBusyCache, uniqueEvents } from './lib/busyCache.js'
+import { describePlanner, exportPlanner } from './lib/backup.js'
 import { daySummary } from './lib/capacity.js'
 import { monthWeekStarts, shiftMonth } from './lib/month.js'
 import { dayHeadline, halved, placeOn, toPlaceList } from './lib/planning.js'
 import { rollOver, rolloverCandidates } from './lib/rollover.js'
+import { putBack } from './lib/undo.js'
 import {
   canLogAsPlanned,
   entriesOn,
@@ -240,6 +244,8 @@ function App() {
   const [toast, setToast] = useState(null)
   // The Log time form: closed (null), adding ({}), or editing ({ entryId }).
   const [logForm, setLogForm] = useState(null)
+  // The global "+ Add" form (Phase 17), opened by the button or N.
+  const [showAdd, setShowAdd] = useState(false)
   // The recurring chore rules, and the "don't bring this one back" list.
   const [templates, setTemplates] = useState(() => loadTemplates())
   const [skipped, setSkipped] = useState(() => loadSkipped())
@@ -331,6 +337,26 @@ function App() {
 
     window.addEventListener('focus', wakeUp)
     return () => window.removeEventListener('focus', wakeUp)
+  }, [])
+
+  // N opens the Add form on a computer, unless you're typing somewhere:
+  // in a field, a list or a text box, N is just the letter N.
+  useEffect(() => {
+    function handleKey(event) {
+      if (event.key !== 'n' && event.key !== 'N') return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target
+      const typing =
+        target instanceof HTMLElement &&
+        (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+      if (typing) return
+
+      event.preventDefault()
+      setShowAdd(true)
+    }
+
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
   }, [])
 
   // The back button changes the address; follow it to that screen.
@@ -627,18 +653,38 @@ function App() {
     })
   }
 
+  // Shows "message. Undo" for a few seconds. The undo function puts back
+  // whatever was removed; the toast closes either way.
+  function offerUndo(message, undoIt) {
+    setToast({
+      message: message,
+      actionLabel: 'Undo',
+      onAction: () => {
+        undoIt()
+        setToast(null)
+      },
+    })
+  }
+
   function deleteTask(id) {
-    const task = tasks.find((item) => item.id === id)
+    const index = tasks.findIndex((item) => item.id === id)
+    if (index === -1) return
+    const task = tasks[index]
 
     // Deleting a chore means "not this time", not "stop the rule". Note
     // the day so it isn't made again the next time you open that day.
     // A chore copy you unplaced has no day, so there's nothing to note.
-    const day = task ? dayOf(task) : null
-    if (task?.templateId && day) {
-      setSkipped([...skipped, skipKey(task.templateId, day)])
-    }
+    const day = dayOf(task)
+    const key = task.templateId && day ? skipKey(task.templateId, day) : null
+    if (key) setSkipped([...skipped, key])
 
     setTasks(tasks.filter((item) => item.id !== id))
+
+    // Undo puts the task back where it was, and forgets the "skip".
+    offerUndo(`Deleted ${task.title}.`, () => {
+      setTasks((current) => putBack(current, task, index))
+      if (key) setSkipped((current) => current.filter((item) => item !== key))
+    })
   }
 
   // Moving to another day is the moment its chores are filled in. The
@@ -660,7 +706,13 @@ function App() {
   // Deleting a rule stops future copies. The ones already on your days
   // stay: they're ordinary tasks now, and some may be done already.
   function deleteTemplate(id) {
-    setTemplates(templates.filter((template) => template.id !== id))
+    const index = templates.findIndex((template) => template.id === id)
+    if (index === -1) return
+    const template = templates[index]
+    setTemplates(templates.filter((item) => item.id !== id))
+    offerUndo(`Deleted the ${template.title} rule.`, () =>
+      setTemplates((current) => putBack(current, template, index)),
+    )
   }
 
   // ---- Planning (Phase 12) ----
@@ -696,20 +748,7 @@ function App() {
     if (index === -1) return
     const task = tasks[index]
     setTasks(tasks.filter((item) => item.id !== id))
-    setToast({
-      message: `Dropped ${task.title}.`,
-      actionLabel: 'Undo',
-      // Puts it back where it was, unless it somehow came back already.
-      onAction: () => {
-        setTasks((current) => {
-          if (current.some((item) => item.id === task.id)) return current
-          const next = [...current]
-          next.splice(Math.min(index, next.length), 0, task)
-          return next
-        })
-        setToast(null)
-      },
-    })
+    offerUndo(`Dropped ${task.title}.`, () => setTasks((current) => putBack(current, task, index)))
   }
 
   // ---- The timer (Phase 13) ----
@@ -773,19 +812,13 @@ function App() {
 
   // Deleting an entry, with a few seconds to change your mind.
   function deleteEntry(id) {
-    const entry = entries.find((item) => item.id === id)
-    if (!entry) return
+    const index = entries.findIndex((item) => item.id === id)
+    if (index === -1) return
+    const entry = entries[index]
     setEntries(entries.filter((item) => item.id !== id))
-    setToast({
-      message: `Deleted ${entry.label}.`,
-      actionLabel: 'Undo',
-      onAction: () => {
-        setEntries((current) =>
-          current.some((item) => item.id === entry.id) ? current : [...current, entry],
-        )
-        setToast(null)
-      },
-    })
+    offerUndo(`Deleted ${entry.label}.`, () =>
+      setEntries((current) => putBack(current, entry, index)),
+    )
   }
 
   // What every task row needs to know about the timer.
@@ -831,24 +864,67 @@ function App() {
   }
 
   function deleteAway(id) {
-    const block = away.find((item) => item.id === id)
-    if (!block) return
+    const index = away.findIndex((item) => item.id === id)
+    if (index === -1) return
+    const block = away[index]
     setAway(away.filter((item) => item.id !== id))
-    setToast({
-      message: `Deleted ${block.title}.`,
-      actionLabel: 'Undo',
-      onAction: () => {
-        setAway((current) =>
-          current.some((item) => item.id === block.id) ? current : [...current, block],
-        )
-        setToast(null)
-      },
-    })
+    offerUndo(`Deleted ${block.title}.`, () => setAway((current) => putBack(current, block, index)))
+  }
+
+  // ---- Data (Phase 17) ----
+
+  // Everything that makes up the planner, as cloud.js saves it.
+  function currentPlanner() {
+    return {
+      tasks: tasks,
+      templates: templates,
+      skipped: skipped,
+      collapsed: collapsed,
+      areas: areas,
+      entries: entries,
+      activeTimer: activeTimer,
+      away: away,
+      settings: settings,
+    }
+  }
+
+  function setPlanner(planner) {
+    setTasks(planner.tasks)
+    setTemplates(planner.templates)
+    setSkipped(planner.skipped)
+    setCollapsed(planner.collapsed)
+    setAreas(planner.areas)
+    setEntries(planner.entries)
+    setActiveTimer(planner.activeTimer)
+    setAway(planner.away)
+    setSettings(planner.settings)
+  }
+
+  // Replaces everything with an import. The old planner is kept for the
+  // Undo, so a wrong paste costs nothing if you're quick.
+  function importPlanner(planner) {
+    const before = currentPlanner()
+    setPlanner(planner)
+    offerUndo(`Imported ${describePlanner(planner)}.`, () => setPlanner(before))
   }
 
   // Archives an Area that's in use, deletes one that isn't (areas.js).
   function deleteArea(id) {
-    setAreas(removeArea(areas, id, tasks, entries))
+    const index = areas.findIndex((area) => area.id === id)
+    if (index === -1) return
+    const area = areas[index]
+    const next = removeArea(areas, id, tasks, entries)
+    const archived = next.length === areas.length
+
+    setAreas(next)
+    offerUndo(archived ? `Archived ${area.name}.` : `Deleted ${area.name}.`, () =>
+      // Put back exactly as it was: un-archived, or returned to the list.
+      setAreas((current) =>
+        current.some((item) => item.id === id)
+          ? current.map((item) => (item.id === id ? area : item))
+          : putBack(current, area, index),
+      ),
+    )
   }
 
   function toggleCollapse(categoryId) {
@@ -880,6 +956,10 @@ function App() {
     away: away,
   })
 
+  // Nothing at all yet: show the welcome card.
+  const isEmptyPlanner =
+    areas.length === 0 && tasks.length === 0 && templates.length === 0 && entries.length === 0
+
   // The morning question: only when rollover is on, there's something to
   // move, and it hasn't been answered today.
   const rolloverCount =
@@ -896,9 +976,21 @@ function App() {
           <p className="today">{formatDay(selectedDay, new Date(`${today}T12:00`))}</p>
         )}
 
+        {/* The three buttons move together: on a narrow phone they wrap
+            onto a line of their own, rather than one at a time. */}
+        <div className="header-actions">
         {/* Filled while its panel is open, outline when closed. */}
         <Button
-          className="areas-button"
+          variant={showAdd ? 'default' : 'outline'}
+          onClick={() => setShowAdd(!showAdd)}
+          aria-expanded={showAdd}
+          aria-keyshortcuts="N"
+          title="Add a task (N)"
+        >
+          + Add
+        </Button>
+
+        <Button
           variant={showAreas ? 'default' : 'outline'}
           onClick={() => setShowAreas(!showAreas)}
           aria-expanded={showAreas}
@@ -913,6 +1005,7 @@ function App() {
         >
           Repeats
         </Button>
+        </div>
       </header>
 
       {/* Sticky: what's running stays in view on every screen. */}
@@ -923,6 +1016,16 @@ function App() {
         onResume={resumeLast}
         onLogTime={() => setLogForm({})}
       />
+
+      {showAdd && (
+        <AddPanel
+          areas={areas}
+          tasks={[...tasks, ...busy]}
+          defaultDay={tab === 'day' ? selectedDay : today}
+          onAdd={addTask}
+          onClose={() => setShowAdd(false)}
+        />
+      )}
 
       {logForm && (
         <LogTimeForm
@@ -998,6 +1101,8 @@ function App() {
           onAddAway={addAway}
           onChangeAway={changeAway}
           onDeleteAway={deleteAway}
+          getExport={() => exportPlanner(currentPlanner())}
+          onImport={importPlanner}
         />
       )}
 
@@ -1019,6 +1124,11 @@ function App() {
       )}
 
       <TabBar tab={tab} onChange={changeTab} />
+
+      {/* A brand-new planner starts here rather than with empty sections. */}
+      {tab === 'day' && isEmptyPlanner && !showAreas && (
+        <Welcome onAddAreas={() => setShowAreas(true)} onAddTask={() => setShowAdd(true)} />
+      )}
 
       {tab === 'day' && (
         <>

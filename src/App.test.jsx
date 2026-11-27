@@ -1477,3 +1477,125 @@ test('Areas touched per day shows the last 14 days', () => {
   expect(switching.getAllByRole('listitem')).toHaveLength(14)
   expect(switching.getByLabelText(`${formatShortDay(today)}: 2 Areas`)).toBeTruthy()
 })
+
+// ---- Phase 17: Undo everywhere, data, + Add, N, welcome ----
+
+test('deleting a task offers Undo, which puts it back', () => {
+  render(<App />)
+  addTo('Chores', { title: 'Laundry', time: '10:00' })
+
+  fireEvent.click(screen.getByLabelText('Delete Laundry'))
+  expect(screen.queryByText('Laundry')).toBeNull()
+  expect(screen.getByText('Deleted Laundry.')).toBeTruthy()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(within(section('Chores')).getByText('Laundry')).toBeTruthy()
+})
+
+test('undoing a deleted chore brings it back for that day too', () => {
+  render(<App />)
+  addChore({ title: 'Cook dinner', time: '18:00' })
+
+  fireEvent.click(within(section('Meals')).getByLabelText('Delete Cook dinner'))
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+  expect(within(section('Meals')).getByText('Cook dinner')).toBeTruthy()
+  // The "skip this day" note was taken back as well.
+  expect(JSON.parse(localStorage.getItem('dagen.skipped.v1'))).toEqual([])
+})
+
+test('deleting a chore rule and an Area offer Undo', () => {
+  render(<App />)
+  addChore({ title: 'Cook dinner', time: '18:00' })
+  fireEvent.click(screen.getByRole('button', { name: 'Repeats' }))
+  fireEvent.click(screen.getByLabelText('Delete the Cook dinner chore'))
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(within(screen.getByRole('region', { name: 'Recurring chores' })).getByText('Cook dinner')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Repeats' }))
+
+  const panel = addArea({ name: 'Gesture bloom' })
+  fireEvent.click(panel.getByLabelText('Delete Gesture bloom'))
+  expect(panel.queryByText('Gesture bloom')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(panel.getByText('Gesture bloom')).toBeTruthy()
+})
+
+test('Import JSON checks the text, replaces everything, and can be undone', () => {
+  seed([{ id: 'old', title: 'Old task', day: today }])
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+  const data = within(screen.getByRole('region', { name: 'Data' }))
+
+  fireEvent.change(data.getByLabelText('Paste an export'), { target: { value: '{"hello": 1}' } })
+  fireEvent.click(data.getByRole('button', { name: 'Import JSON' }))
+  expect(data.getByRole('alert').textContent).toBe('This doesn’t look like a Dagen export.')
+
+  const exported = JSON.stringify({
+    app: 'dagen',
+    version: 3,
+    planner: { tasks: [{ id: 'new', title: 'Imported task', day: today, start: null }], areas: [] },
+  })
+  fireEvent.change(data.getByLabelText('Paste an export'), { target: { value: exported } })
+  fireEvent.click(data.getByRole('button', { name: 'Import JSON' }))
+
+  expect(screen.getByText('Imported task')).toBeTruthy()
+  expect(screen.queryByText('Old task')).toBeNull()
+  expect(screen.getByText('Imported 1 task, 0 Areas, 0 time entries.')).toBeTruthy()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(screen.getByText('Old task')).toBeTruthy()
+  expect(screen.queryByText('Imported task')).toBeNull()
+})
+
+test('Copy as JSON falls back to a text box when the clipboard is off limits', async () => {
+  seed([{ id: 'a', title: 'Laundry', day: today }])
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+  const data = within(screen.getByRole('region', { name: 'Data' }))
+
+  // jsdom has no clipboard, which is exactly the case being tested.
+  fireEvent.click(data.getByRole('button', { name: 'Copy as JSON' }))
+
+  const box = await data.findByLabelText('Your planner as JSON')
+  expect(JSON.parse(box.value)).toMatchObject({ app: 'dagen', planner: { tasks: [{ title: 'Laundry' }] } })
+})
+
+test('+ Add and the N key open one form for any category', () => {
+  render(<App />)
+
+  fireEvent.keyDown(window, { key: 'n' })
+  const add = within(screen.getByRole('region', { name: 'Add' }))
+  fireEvent.change(add.getByLabelText('Category'), { target: { value: 'learning' } })
+  fireEvent.change(add.getByLabelText('New task in Learning'), { target: { value: 'Read paper' } })
+  fireEvent.submit(add.getByLabelText('New task in Learning').closest('form'))
+  fireEvent.click(add.getByRole('button', { name: 'Done' }))
+
+  expect(screen.queryByRole('region', { name: 'Add' })).toBeNull()
+  expect(within(section('Learning')).getByText('Read paper')).toBeTruthy()
+
+  fireEvent.click(screen.getByRole('button', { name: '+ Add' }))
+  expect(screen.getByRole('region', { name: 'Add' })).toBeTruthy()
+})
+
+test('N while typing in a field is just the letter N', () => {
+  render(<App />)
+  fireEvent.click(screen.getByLabelText('Add to Chores'))
+  const input = within(section('Chores')).getByLabelText('New task in Chores')
+
+  fireEvent.keyDown(input, { key: 'n' })
+  expect(screen.queryByRole('region', { name: 'Add' })).toBeNull()
+})
+
+test('a brand-new planner starts with the welcome card, which leaves once there is something', () => {
+  render(<App />)
+  const welcome = within(screen.getByRole('region', { name: 'Welcome' }))
+  expect(welcome.getByText('Start by adding your Areas')).toBeTruthy()
+
+  fireEvent.click(welcome.getByRole('button', { name: 'Add your Areas' }))
+  expect(screen.getByRole('region', { name: 'Areas' })).toBeTruthy()
+  expect(screen.queryByRole('region', { name: 'Welcome' })).toBeNull()
+
+  addArea({ name: 'KTH courses' })
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+  expect(screen.queryByRole('region', { name: 'Welcome' })).toBeNull()
+})
