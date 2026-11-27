@@ -33,5 +33,9 @@ export function toBusyBlocks(events) {
       // Marks it as something you can't edit here. The rows use this to
       // avoid offering a pencil on a lecture.
       external: true,
+      // Google marks each copy of a repeating event with the id of the
+      // series. The Month view leaves those out of its day labels (a
+      // weekly lecture in every cell would drown everything else).
+      recurring: Boolean(event.recurringEventId),
     }))
 }

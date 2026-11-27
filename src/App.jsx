@@ -16,6 +16,10 @@
   the Day screen its day, the Week screen its week. App also asks the
   morning rollover question, and fetches busy calendars a week at a time.
 
+  Since Phase 14 there's a Month screen too, with the monthly hour
+  budgets. Its sums include weekly chores and lectures as previews
+  (recurring.js), so a month of copies is never saved or sent to Google.
+
   Since Phase 13 it runs the one timer (timer.js): starting a task stops
   whatever ran before, every stop saves one time entry, and both the
   timer and the entries are saved, here and in the cloud.
@@ -38,12 +42,14 @@ import NowBar from './components/NowBar.jsx'
 import TimeLog from './components/TimeLog.jsx'
 import Toast from './components/Toast.jsx'
 import WeekStrip from './components/WeekStrip.jsx'
+import MonthView from './components/MonthView.jsx'
 import WeekView from './components/WeekView.jsx'
 import { CATEGORIES, DEFAULT_CATEGORY_ID, TABS, getCategory } from './config.js'
 import { createArea, removeArea, updateArea } from './lib/areas.js'
 import { toBusyBlocks } from './lib/busy.js'
 import { createBusyCache, uniqueEvents } from './lib/busyCache.js'
 import { daySummary } from './lib/capacity.js'
+import { monthWeekStarts, shiftMonth } from './lib/month.js'
 import { dayHeadline, halved, placeOn, toPlaceList } from './lib/planning.js'
 import { rollOver, rolloverCandidates } from './lib/rollover.js'
 import {
@@ -67,12 +73,13 @@ import {
   updateEvent,
 } from './lib/googleCalendar.js'
 import { applyIncoming } from './lib/incoming.js'
-import { missingTasks, skipKey } from './lib/recurring.js'
+import { missingTasks, previewChores, skipKey } from './lib/recurring.js'
 import { isConfigured, supabase } from './lib/supabase.js'
 import {
   addDays,
   formatDay,
   formatMonthLabel,
+  monthDays,
   startOfWeek,
   toMinutes,
   toStart,
@@ -213,6 +220,8 @@ function App() {
   // Which screen, and where the Week screen is (any day in its week).
   const [tab, setTab] = useState(() => initialTab())
   const [weekDay, setWeekDay] = useState(() => todayISO())
+  // And the Month screen's place: any day in the month it shows.
+  const [monthDay, setMonthDay] = useState(() => todayISO())
   // The day the rollover question was last answered.
   const [rolloverAsked, setRolloverAsked] = useState(() => loadRolloverAsked())
   // The message at the bottom: { message, actionLabel?, onAction? } or null.
@@ -536,6 +545,9 @@ function App() {
   // screen's week. The cache means moving back and forth asks Google once.
   const dayWeek = startOfWeek(selectedDay)
   const shownWeek = startOfWeek(weekDay)
+  // Since Phase 14 the Month screen needs every week it touches (4 to 6).
+  // Joined into one text so the effect below only reruns when it changes.
+  const monthWeeks = tab === 'month' ? monthWeekStarts(monthDay).join(',') : ''
 
   useEffect(() => {
     if (!calendarToken || busyCalendars.length === 0) {
@@ -552,7 +564,10 @@ function App() {
     }
 
     let active = true
-    const weeks = dayWeek === shownWeek ? [dayWeek] : [dayWeek, shownWeek]
+    // Each week once, whichever screens need it.
+    const weeks = [
+      ...new Set([dayWeek, shownWeek, ...(monthWeeks ? monthWeeks.split(',') : [])]),
+    ]
 
     Promise.all(
       weeks.flatMap((week) =>
@@ -565,7 +580,7 @@ function App() {
     return () => {
       active = false
     }
-  }, [calendarToken, busyCalendars, dayWeek, shownWeek, busyRefresh])
+  }, [calendarToken, busyCalendars, dayWeek, shownWeek, monthWeeks, busyRefresh])
 
   // A new task gets every Phase 11 field. The details come last, so
   // anything the form chose (including a category set by an Area) wins.
@@ -836,7 +851,7 @@ function App() {
 
   return (
     // The Week screen needs more room than a phone column on a computer.
-    <main className={tab === 'week' ? 'app wide' : 'app'}>
+    <main className={tab === 'week' || tab === 'month' ? 'app wide' : 'app'}>
       <header className="app-header">
         <h1>Dagen</h1>
         {tab === 'day' && (
@@ -1049,6 +1064,25 @@ function App() {
           onDrop={dropTask}
           onDropOnDay={placeTask}
           onUnplace={unplaceTask}
+        />
+      )}
+
+      {tab === 'month' && (
+        <MonthView
+          monthDay={monthDay}
+          today={today}
+          // Real tasks plus previews of the month's weekly chores and
+          // lectures, so their hours count without being saved.
+          tasks={[...tasks, ...previewChores(templates, monthDays(monthDay), tasks, skipped)]}
+          busy={busy}
+          areas={areas}
+          entries={entries}
+          settings={settings}
+          away={away}
+          onShiftMonth={(amount) => setMonthDay(shiftMonth(monthDay, amount))}
+          onThisMonth={() => setMonthDay(today)}
+          onOpenDay={openDay}
+          onChangeBudget={(id, hours) => changeArea(id, { monthlyBudgetHours: hours })}
         />
       )}
 
