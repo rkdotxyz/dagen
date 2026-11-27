@@ -61,6 +61,6 @@ export const TABS = [
   { id: 'day', name: 'Day', ready: true },
   { id: 'week', name: 'Week', ready: true },
   { id: 'month', name: 'Month', ready: true },
-  { id: 'quarter', name: 'Quarter', ready: false },
+  { id: 'quarter', name: 'Quarter', ready: true },
   { id: 'insights', name: 'Insights', ready: false },
 ]

@@ -731,6 +731,13 @@ function weekScreen() {
 }
 
 const today = todayISO()
+
+// Opens a day near today on the strip, going back a week first when it's
+// in last week (yesterday, on a Monday).
+function showDay(day) {
+  if (!weekDays(today).includes(day)) fireEvent.click(screen.getByLabelText('Previous week'))
+  fireEvent.click(dayButton(new RegExp(`^${formatDay(day)}`)))
+}
 const yesterday = addDays(today, -1)
 
 test('the tabs switch between Day and Week, and the others are coming soon', () => {
@@ -740,9 +747,9 @@ test('the tabs switch between Day and Week, and the others are coming soon', () 
   openTab('Week')
   expect(weekScreen().getByText(new RegExp(`^Week ${isoWeek(today)} has`))).toBeTruthy()
   expect(window.location.hash).toBe('#week')
-  // Changed in Phase 14 (on purpose): Month is ready, so Quarter is now
-  // the first one still to come.
-  expect(screen.getByRole('button', { name: 'Quarter (coming soon)' }).disabled).toBe(true)
+  // Changed in Phases 14 and 15 (on purpose): Month and Quarter are
+  // ready, so Insights is the one still to come.
+  expect(screen.getByRole('button', { name: 'Insights (coming soon)' }).disabled).toBe(true)
 
   openTab('Day')
   expect(screen.queryByRole('region', { name: 'Week' })).toBeNull()
@@ -1038,6 +1045,11 @@ test('stopping saves exactly one entry, shown in the day\'s time log', () => {
   expect(nowBar().getByText('Nothing running')).toBeTruthy()
   expect(savedEntries()).toHaveLength(1)
   expect(savedEntries()[0]).toMatchObject({ label: 'Reading', source: 'timer', categoryId: 'learning' })
+
+  // An entry belongs to the day it started on. Just after midnight that's
+  // yesterday, so open that day first.
+  const startDay = savedEntries()[0].start.slice(0, 10)
+  if (startDay !== today) showDay(startDay)
   expect(timeLog().getByText('Reading')).toBeTruthy()
   expect(timeLog().getByText(/30m · timer/)).toBeTruthy()
 })
@@ -1080,7 +1092,7 @@ test('a past block with nothing logged offers Log as planned, once', () => {
   // Yesterday's task would otherwise trigger the morning question.
   localStorage.setItem('dagen.rolloverAsked.v1', today)
   render(<App />)
-  fireEvent.click(dayButton(new RegExp(`^${formatDay(yesterday)}`)))
+  showDay(yesterday)
 
   fireEvent.click(within(section('Learning')).getByRole('button', { name: 'Log as planned' }))
 
@@ -1236,4 +1248,135 @@ test('budgets bigger than the month say by how much', () => {
       /^Over by \d+h\. Lower a budget or pause an Area\.$/,
     ),
   ).toBeTruthy()
+})
+
+// ---- Phase 15: the Quarter screen and away blocks ----
+
+function quarterScreen() {
+  return within(screen.getByRole('region', { name: 'Quarter' }))
+}
+
+test('the Quarter screen counts active Areas and warns above the limit', () => {
+  seedAreas([
+    { id: 'a1', name: 'One' },
+    { id: 'a2', name: 'Two' },
+    { id: 'a3', name: 'Three', status: 'maintain' },
+  ])
+  localStorage.setItem(
+    'dagen.settings.v1',
+    JSON.stringify({ capacity: { weekday: 8, weekend: 4 }, activeAreaLimit: 1, rolloverEnabled: true }),
+  )
+  render(<App />)
+  openTab('Quarter')
+
+  expect(quarterScreen().getByRole('heading', { name: '2 active Areas this quarter, more than 1' })).toBeTruthy()
+  expect(window.location.hash).toBe('#quarter')
+})
+
+test('tapping an Area in triage moves it to the next column, and it is saved', () => {
+  seedAreas([{ id: 'a1', name: 'Swedish' }])
+  render(<App />)
+  openTab('Quarter')
+  const triage = within(screen.getByRole('region', { name: 'Triage' }))
+
+  fireEvent.click(triage.getByRole('button', { name: 'Swedish, Active. Move to Maintain' }))
+  expect(within(triage.getByRole('group', { name: 'Maintain' })).getByText('Swedish')).toBeTruthy()
+
+  fireEvent.click(triage.getByRole('button', { name: 'Swedish, Maintain. Move to Paused' }))
+  fireEvent.click(triage.getByRole('button', { name: 'Swedish, Paused. Move to Active' }))
+  expect(within(triage.getByRole('group', { name: 'Active' })).getByText('Swedish')).toBeTruthy()
+
+  expect(JSON.parse(localStorage.getItem('dagen.areas.v1'))[0].status).toBe('active')
+})
+
+test('the timeline has a lane for an Area with a deadline, with its marker', () => {
+  seedAreas([
+    { id: 'a_rk', name: 'Räckvidd' },
+    { id: 'a_none', name: 'Nothing dated' },
+  ])
+  seed([{ id: 't', title: 'Exhibit text', areaId: 'a_rk', due: addDays(today, 10) }])
+  render(<App />)
+  openTab('Quarter')
+  const timeline = within(screen.getByRole('region', { name: 'Timeline' }))
+
+  expect(timeline.getAllByRole('listitem')).toHaveLength(1)
+  expect(timeline.getByText('Räckvidd')).toBeTruthy()
+  expect(timeline.queryByText('Nothing dated')).toBeNull()
+  expect(
+    timeline.getByRole('img', { name: `Deadline: Exhibit text, ${formatShortDay(addDays(today, 10))}` }),
+  ).toBeTruthy()
+})
+
+test('an outcome can be written for an active Area', () => {
+  seedAreas([{ id: 'a_rk', name: 'Räckvidd', monthlyBudgetHours: 20 }])
+  render(<App />)
+  openTab('Quarter')
+  const outcomes = within(screen.getByRole('region', { name: 'Outcomes' }))
+
+  expect(outcomes.getByText('No outcome yet. What will be true by the end?')).toBeTruthy()
+  expect(outcomes.getByText('0h / 60h tracked')).toBeTruthy()
+
+  fireEvent.click(outcomes.getByLabelText('Edit the outcome for Räckvidd'))
+  fireEvent.change(outcomes.getByLabelText('Outcome for Räckvidd'), {
+    target: { value: 'Exhibit running at NAVET' },
+  })
+  fireEvent.click(outcomes.getByRole('button', { name: 'Save' }))
+
+  expect(outcomes.getByText('Exhibit running at NAVET')).toBeTruthy()
+})
+
+test('away time can be added, and that day has no free hours', () => {
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+  const away = within(screen.getByRole('region', { name: 'Away' }))
+
+  fireEvent.change(away.getByLabelText('New away block name'), { target: { value: 'Trip' } })
+  fireEvent.change(away.getByLabelText('First day away'), { target: { value: today } })
+  fireEvent.click(away.getByRole('button', { name: 'Add away time' }))
+  expect(away.getByRole('alert').textContent).toBe('Add the first and last day.')
+
+  fireEvent.change(away.getByLabelText('Last day away'), { target: { value: addDays(today, 2) } })
+  fireEvent.click(away.getByRole('button', { name: 'Add away time' }))
+
+  expect(away.getByText('Trip')).toBeTruthy()
+  expect(screen.getByRole('heading', { name: `${weekdayName(today)} · away` })).toBeTruthy()
+})
+
+test('away time can be edited, and deleted with Undo', () => {
+  localStorage.setItem(
+    'dagen.away.v1',
+    JSON.stringify([{ id: 'w', title: 'Winter trip', startDay: '2026-12-18', endDay: '2027-01-05' }]),
+  )
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+  const away = within(screen.getByRole('region', { name: 'Away' }))
+  expect(away.getByText('18 Dec – 5 Jan')).toBeTruthy()
+
+  fireEvent.click(away.getByLabelText('Edit Winter trip'))
+  fireEvent.change(away.getByLabelText('Name of Winter trip'), { target: { value: 'Home for Christmas' } })
+  fireEvent.click(away.getByRole('button', { name: 'Save' }))
+  expect(away.getByText('Home for Christmas')).toBeTruthy()
+
+  fireEvent.click(away.getByLabelText('Delete Home for Christmas'))
+  expect(away.queryByText('Home for Christmas')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(away.getByText('Home for Christmas')).toBeTruthy()
+})
+
+test('an Area can be given start and end days', () => {
+  render(<App />)
+  const panel = addArea({ name: 'Räckvidd' })
+  fireEvent.click(panel.getByLabelText('Edit Räckvidd'))
+  fireEvent.change(panel.getAllByLabelText('Runs from (optional)')[0], { target: { value: '2026-12-10' } })
+  fireEvent.change(panel.getAllByLabelText('Until (optional)')[0], { target: { value: '2026-12-01' } })
+  fireEvent.click(panel.getByRole('button', { name: 'Save' }))
+  expect(panel.getByRole('alert').textContent).toBe('The end can’t be before the start.')
+
+  fireEvent.change(panel.getAllByLabelText('Until (optional)')[0], { target: { value: '2027-01-20' } })
+  fireEvent.click(panel.getByRole('button', { name: 'Save' }))
+
+  expect(JSON.parse(localStorage.getItem('dagen.areas.v1'))[0]).toMatchObject({
+    startDay: '2026-12-10',
+    endDay: '2027-01-20',
+  })
 })
